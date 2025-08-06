@@ -13,9 +13,24 @@ import 'package:vitalh2x/bidings/reading_binding.dart';
 import 'package:vitalh2x/bidings/report_binding.dart';
 import 'package:vitalh2x/routs/midlewar.dart';
 import 'package:vitalh2x/routs/rout.dart';
+import 'package:vitalh2x/views/about_view.dart';
+import 'package:vitalh2x/views/cliente_detail_view.dart';
+import 'package:vitalh2x/views/cliente_form_view.dart';
+import 'package:vitalh2x/views/cliente_list_view.dart';
 import 'package:vitalh2x/views/dashboard_view.dart';
+import 'package:vitalh2x/views/debt_report_view.dart';
+import 'package:vitalh2x/views/help_view.dart';
 import 'package:vitalh2x/views/home_view.dart';
 import 'package:vitalh2x/views/login_view.dart';
+import 'package:vitalh2x/views/monthly_readings_view.dart';
+import 'package:vitalh2x/views/monthly_report_view.dart';
+import 'package:vitalh2x/views/payment_form_view.dart';
+import 'package:vitalh2x/views/payment_history_view.dart';
+import 'package:vitalh2x/views/payment_list_view.dart';
+import 'package:vitalh2x/views/reading_form_view.dart';
+import 'package:vitalh2x/views/reading_list_view.dart';
+import 'package:vitalh2x/views/reports_view.dart';
+import 'package:vitalh2x/views/settings_view.dart';
 import 'package:vitalh2x/views/splashscreen.dart';
 
 class AppPages {
@@ -55,21 +70,21 @@ class AppPages {
     // ===== CLIENT ROUTES =====
     GetPage(
       name: Routes.CLIENTS,
-      page: () => Center(), // const ClientListView(),
+      page: () => ClientListView(),
       binding: ClientBinding(),
       middlewares: [AuthMiddleware(), ClientAccessMiddleware()],
     ),
 
     GetPage(
       name: Routes.CLIENT_FORM,
-      page: () => Center(), // const ClientFormView(),
+      page: () => ClientFormView(),
       binding: ClientBinding(),
       middlewares: [AuthMiddleware(), ClientManagementMiddleware()],
     ),
 
     GetPage(
       name: Routes.CLIENT_DETAIL,
-      page: () => Center(), // const ClientDetailView(),
+      page: () => ClientDetailView(),
       binding: ClientBinding(),
       middlewares: [AuthMiddleware(), ClientAccessMiddleware()],
     ),
@@ -77,21 +92,21 @@ class AppPages {
     // ===== READING ROUTES =====
     GetPage(
       name: Routes.READINGS,
-      page: () => Center(), // const ReadingListView(),
+      page: () => ReadingListView(),
       binding: ReadingBinding(),
       middlewares: [AuthMiddleware()], // Todos podem ver leituras
     ),
 
     GetPage(
       name: Routes.READING_FORM,
-      page: () => Center(), // const ReadingFormView(),
+      page: () => ReadingFormView(),
       binding: ReadingBinding(),
       middlewares: [AuthMiddleware()], // Todos podem fazer leituras
     ),
 
     GetPage(
       name: Routes.MONTHLY_READINGS,
-      page: () => Center(), // const MonthlyReadingsView(),
+      page: () => MonthlyReadingsView(),
       binding: ReadingBinding(),
       middlewares: [AuthMiddleware()],
     ),
@@ -99,21 +114,21 @@ class AppPages {
     // ===== PAYMENT ROUTES =====
     GetPage(
       name: Routes.PAYMENTS,
-      page: () => Center(), // const PaymentListView(),
+      page: () => PaymentListView(),
       binding: PaymentBinding(),
       middlewares: [AuthMiddleware(), PaymentAccessMiddleware()],
     ),
 
     GetPage(
       name: Routes.PAYMENT_FORM,
-      page: () => Center(), // const PaymentFormView(),
+      page: () => PaymentFormView(),
       binding: PaymentBinding(),
       middlewares: [AuthMiddleware(), PaymentManagementMiddleware()],
     ),
 
     GetPage(
       name: Routes.PAYMENT_HISTORY,
-      page: () => Center(), // const PaymentHistoryView(),
+      page: () => PaymentHistoryView(),
       binding: PaymentBinding(),
       middlewares: [AuthMiddleware(), PaymentAccessMiddleware()],
     ),
@@ -121,21 +136,21 @@ class AppPages {
     // ===== REPORT ROUTES =====
     GetPage(
       name: Routes.REPORTS,
-      page: () => Center(), // const ReportsView(),
+      page: () => ReportsView(),
       binding: ReportBinding(),
       middlewares: [AuthMiddleware(), ReportAccessMiddleware()],
     ),
 
     GetPage(
       name: Routes.MONTHLY_REPORT,
-      page: () => Center(), // const MonthlyReportView(),
+      page: () => MonthlyReportView(),
       binding: ReportBinding(),
       middlewares: [AuthMiddleware(), ReportAccessMiddleware()],
     ),
 
     GetPage(
       name: Routes.DEBT_REPORT,
-      page: () => Center(), // const DebtReportView(),
+      page: () => DebtReportView(),
       binding: ReportBinding(),
       middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
@@ -143,7 +158,7 @@ class AppPages {
     // ===== SETTINGS ROUTES =====
     GetPage(
       name: Routes.SETTINGS,
-      page: () => Center(), // const SettingsView(),
+      page: () => SettingsView(),
       binding: HomeBinding(),
       middlewares: [AuthMiddleware()],
     ),
@@ -151,14 +166,14 @@ class AppPages {
     // ===== HELP ROUTES =====
     GetPage(
       name: Routes.HELP,
-      page: () => Center(), // const HelpView(),
+      page: () => HelpView(),
       binding: HomeBinding(),
       middlewares: [AuthMiddleware()],
     ),
 
     GetPage(
       name: Routes.ABOUT,
-      page: () => Center(), // const AboutView(),
+      page: () => AboutView(),
       binding: HomeBinding(),
     ),
   ];
