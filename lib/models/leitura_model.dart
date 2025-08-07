@@ -1,4 +1,4 @@
-// ===== READING MODEL =====
+// ===== READING MODEL - VERSÃO LIMPA =====
 // lib/app/data/models/reading_model.dart
 
 import 'package:vitalh2x/models/metodo_pagamento_model.dart';

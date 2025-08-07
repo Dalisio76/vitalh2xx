@@ -150,22 +150,23 @@ class ClientController extends BaseController {
   }
 
   // Create client
-  Future<void> createClient() async {
+  // Create client - MÉTODO CORRIGIDO
+  Future<bool> createClient() async {
     try {
-      if (!_validateForm()) return;
+      if (!_validateForm()) return false;
 
       showLoading('Cadastrando cliente...');
 
       // Check if reference exists
       if (await _clientRepository.referenceExists(reference.value)) {
         showError('Referência já existe');
-        return;
+        return false;
       }
 
       // Check if counter number exists
       if (await _clientRepository.counterNumberExists(counterNumber.value)) {
         showError('Número do contador já existe');
-        return;
+        return false;
       }
 
       final client = ClientModel(
@@ -178,21 +179,27 @@ class ClientController extends BaseController {
 
       await _clientRepository.create(client);
 
-      clearForm();
+      // Atualizar dados
       await loadClients(refresh: true);
       await loadStats();
 
       showSuccess('Cliente cadastrado com sucesso!');
+
+      // Aguardar um pouco para mostrar a mensagem antes de fechar
+      await Future.delayed(const Duration(milliseconds: 1500));
       Get.back();
+
+      return true;
     } catch (e) {
       handleException(e);
+      return false;
     }
   }
 
-  // Update client
-  Future<void> updateClient(String clientId) async {
+  // Update client - MÉTODO CORRIGIDO
+  Future<bool> updateClient(String clientId) async {
     try {
-      if (!_validateForm()) return;
+      if (!_validateForm()) return false;
 
       showLoading('Atualizando cliente...');
 
@@ -202,7 +209,7 @@ class ClientController extends BaseController {
         excludeId: clientId,
       )) {
         showError('Referência já existe');
-        return;
+        return false;
       }
 
       // Check if counter number exists (excluding current client)
@@ -211,7 +218,7 @@ class ClientController extends BaseController {
         excludeId: clientId,
       )) {
         showError('Número do contador já existe');
-        return;
+        return false;
       }
 
       final client = selectedClient.value!.copyWith(
@@ -224,14 +231,20 @@ class ClientController extends BaseController {
 
       await _clientRepository.update(clientId, client);
 
-      clearForm();
+      // Atualizar dados
       await loadClients(refresh: true);
       await loadStats();
 
       showSuccess('Cliente atualizado com sucesso!');
+
+      // Aguardar um pouco para mostrar a mensagem antes de fechar
+      await Future.delayed(const Duration(milliseconds: 1500));
       Get.back();
+
+      return true;
     } catch (e) {
       handleException(e);
+      return false;
     }
   }
 
@@ -284,12 +297,19 @@ class ClientController extends BaseController {
   }
 
   // Clear form
+  // Clear form - MÉTODO MELHORADO
   void clearForm() {
     name.value = '';
     contact.value = '';
     reference.value = '';
     counterNumber.value = '';
     selectedClient.value = null;
+
+    // Força a atualização dos observáveis
+    name.refresh();
+    contact.refresh();
+    reference.refresh();
+    counterNumber.refresh();
   }
 
   // Form validation

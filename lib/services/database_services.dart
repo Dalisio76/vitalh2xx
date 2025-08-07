@@ -79,7 +79,7 @@ class DatabaseService {
         )
       ''');
 
-      // Tabela de Leituras
+      // Tabela de Leituras - VERSÃO ATUALIZADA COM TIMESTAMPS
       await db.execute('''
         CREATE TABLE readings (
           id TEXT PRIMARY KEY,
@@ -95,6 +95,8 @@ class DatabaseService {
           payment_date TEXT,
           notes TEXT,
           is_synced INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
           UNIQUE(client_id, month, year)
         )
@@ -114,6 +116,8 @@ class DatabaseService {
           notes TEXT,
           user_id TEXT NOT NULL,
           is_synced INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
           FOREIGN KEY (reading_id) REFERENCES readings (id) ON DELETE CASCADE,
           FOREIGN KEY (user_id) REFERENCES users (id)
@@ -142,6 +146,9 @@ class DatabaseService {
       'CREATE INDEX idx_clients_counter ON clients(counter_number)',
     );
     await db.execute('CREATE INDEX idx_clients_active ON clients(is_active)');
+    await db.execute(
+      'CREATE INDEX idx_clients_created_at ON clients(created_at)',
+    );
 
     await db.execute('CREATE INDEX idx_readings_client ON readings(client_id)');
     await db.execute(
@@ -153,6 +160,12 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX idx_readings_month_year ON readings(month, year)',
     );
+    await db.execute(
+      'CREATE INDEX idx_readings_created_at ON readings(created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_readings_updated_at ON readings(updated_at)',
+    );
 
     await db.execute('CREATE INDEX idx_payments_client ON payments(client_id)');
     await db.execute(
@@ -160,6 +173,9 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX idx_payments_date ON payments(payment_date)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_payments_created_at ON payments(created_at)',
     );
 
     await db.execute('CREATE INDEX idx_users_email ON users(email)');
@@ -199,11 +215,106 @@ class DatabaseService {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('Upgrading database from version $oldVersion to $newVersion');
 
-    // Aqui você pode adicionar migrações futuras
-    if (oldVersion < 2) {
-      // Exemplo de migração para versão 2
-      // await db.execute('ALTER TABLE clients ADD COLUMN new_field TEXT');
+    try {
+      if (oldVersion < 2) {
+        print('🔄 Executando migração para versão 2...');
+        await _migrateToVersion2(db);
+      }
+
+      if (oldVersion < 3) {
+        print('🔄 Executando migração para versão 3...');
+        await _migrateToVersion3(db);
+      }
+
+      // Adicione outras migrações conforme necessário
+    } catch (e) {
+      print('❌ Erro durante upgrade: $e');
+      rethrow;
     }
+  }
+
+  // Migração para versão 2 - Adicionar timestamps às tabelas
+  Future<void> _migrateToVersion2(Database db) async {
+    await db.transaction((txn) async {
+      // Adicionar timestamps à tabela readings se não existirem
+      try {
+        final readingsInfo = await txn.rawQuery("PRAGMA table_info(readings)");
+        final hasCreatedAt = readingsInfo.any(
+          (col) => col['name'] == 'created_at',
+        );
+        final hasUpdatedAt = readingsInfo.any(
+          (col) => col['name'] == 'updated_at',
+        );
+
+        if (!hasCreatedAt) {
+          await txn.execute('ALTER TABLE readings ADD COLUMN created_at TEXT');
+          await txn.execute('''
+            UPDATE readings 
+            SET created_at = reading_date 
+            WHERE created_at IS NULL
+          ''');
+          print('✅ Coluna created_at adicionada à tabela readings');
+        }
+
+        if (!hasUpdatedAt) {
+          await txn.execute('ALTER TABLE readings ADD COLUMN updated_at TEXT');
+          print('✅ Coluna updated_at adicionada à tabela readings');
+        }
+      } catch (e) {
+        print('ℹ️  Erro ao migrar readings (pode já existir): $e');
+      }
+
+      // Adicionar timestamps à tabela payments se não existirem
+      try {
+        final paymentsInfo = await txn.rawQuery("PRAGMA table_info(payments)");
+        final hasCreatedAt = paymentsInfo.any(
+          (col) => col['name'] == 'created_at',
+        );
+        final hasUpdatedAt = paymentsInfo.any(
+          (col) => col['name'] == 'updated_at',
+        );
+
+        if (!hasCreatedAt) {
+          await txn.execute('ALTER TABLE payments ADD COLUMN created_at TEXT');
+          await txn.execute('''
+            UPDATE payments 
+            SET created_at = payment_date 
+            WHERE created_at IS NULL
+          ''');
+          print('✅ Coluna created_at adicionada à tabela payments');
+        }
+
+        if (!hasUpdatedAt) {
+          await txn.execute('ALTER TABLE payments ADD COLUMN updated_at TEXT');
+          print('✅ Coluna updated_at adicionada à tabela payments');
+        }
+      } catch (e) {
+        print('ℹ️  Erro ao migrar payments (pode já existir): $e');
+      }
+
+      // Criar índices para os novos campos
+      try {
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)',
+        );
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_readings_updated_at ON readings(updated_at)',
+        );
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at)',
+        );
+        print('✅ Índices de timestamp criados');
+      } catch (e) {
+        print('ℹ️  Índices já existem: $e');
+      }
+    });
+  }
+
+  // Migração para versão 3 - Exemplo para futuras migrações
+  Future<void> _migrateToVersion3(Database db) async {
+    // Exemplo: adicionar novas colunas, tabelas, etc.
+    // await db.execute('ALTER TABLE clients ADD COLUMN new_field TEXT');
+    print('✅ Migração para versão 3 executada (exemplo)');
   }
 
   // Executado quando a base de dados é aberta
@@ -211,6 +322,151 @@ class DatabaseService {
     print('Base de dados aberta com sucesso!');
     // Ativar foreign keys
     await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  // ===== MÉTODOS DE MIGRAÇÃO MANUAL =====
+
+  // Migração específica para readings (pode ser chamada manualmente)
+  Future<void> migrateReadingsTable() async {
+    try {
+      print('🔄 Iniciando migração da tabela readings...');
+
+      final db = await this.database;
+
+      await db.transaction((txn) async {
+        // Verificar se as colunas já existem
+        final tableInfo = await txn.rawQuery("PRAGMA table_info(readings)");
+        final hasCreatedAt = tableInfo.any(
+          (col) => col['name'] == 'created_at',
+        );
+        final hasUpdatedAt = tableInfo.any(
+          (col) => col['name'] == 'updated_at',
+        );
+
+        // Adicionar created_at se não existir
+        if (!hasCreatedAt) {
+          await txn.execute('ALTER TABLE readings ADD COLUMN created_at TEXT');
+          print('✅ Coluna created_at adicionada');
+
+          // Preencher dados existentes com reading_date
+          await txn.execute('''
+            UPDATE readings 
+            SET created_at = reading_date 
+            WHERE created_at IS NULL OR created_at = ''
+          ''');
+          print('✅ Dados existentes preenchidos para created_at');
+        } else {
+          print('ℹ️  Coluna created_at já existe');
+        }
+
+        // Adicionar updated_at se não existir
+        if (!hasUpdatedAt) {
+          await txn.execute('ALTER TABLE readings ADD COLUMN updated_at TEXT');
+          print('✅ Coluna updated_at adicionada');
+        } else {
+          print('ℹ️  Coluna updated_at já existe');
+        }
+
+        // Criar índices para performance
+        try {
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)',
+          );
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_readings_updated_at ON readings(updated_at)',
+          );
+          print('✅ Índices criados/verificados');
+        } catch (e) {
+          print('ℹ️  Índices já existem: $e');
+        }
+
+        // Verificar resultado
+        final count = await txn.rawQuery('''
+          SELECT COUNT(*) as total 
+          FROM readings 
+          WHERE created_at IS NOT NULL
+        ''');
+        final total = count.first['total'] as int;
+
+        print('✅ Migração concluída: $total leituras com timestamps');
+      });
+    } catch (e) {
+      print('❌ Erro na migração: $e');
+      rethrow;
+    }
+  }
+
+  // Verificar status da migração
+  Future<Map<String, dynamic>> getMigrationStatus() async {
+    try {
+      final db = await this.database;
+
+      // Verificar estrutura da tabela readings
+      final readingsInfo = await db.rawQuery("PRAGMA table_info(readings)");
+      final hasReadingsCreatedAt = readingsInfo.any(
+        (col) => col['name'] == 'created_at',
+      );
+      final hasReadingsUpdatedAt = readingsInfo.any(
+        (col) => col['name'] == 'updated_at',
+      );
+
+      // Verificar estrutura da tabela payments
+      final paymentsInfo = await db.rawQuery("PRAGMA table_info(payments)");
+      final hasPaymentsCreatedAt = paymentsInfo.any(
+        (col) => col['name'] == 'created_at',
+      );
+      final hasPaymentsUpdatedAt = paymentsInfo.any(
+        (col) => col['name'] == 'updated_at',
+      );
+
+      // Contar registros na tabela readings
+      final totalReadingsResult = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM readings',
+      );
+      final totalReadings = totalReadingsResult.first['total'] as int;
+
+      final withTimestampsResult = await db.rawQuery('''
+        SELECT COUNT(*) as count 
+        FROM readings 
+        WHERE created_at IS NOT NULL
+      ''');
+      final readingsWithTimestamps = withTimestampsResult.first['count'] as int;
+
+      // Contar registros na tabela payments
+      final totalPaymentsResult = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM payments',
+      );
+      final totalPayments = totalPaymentsResult.first['total'] as int;
+
+      return {
+        'readings': {
+          'has_created_at': hasReadingsCreatedAt,
+          'has_updated_at': hasReadingsUpdatedAt,
+          'total_records': totalReadings,
+          'records_with_timestamps': readingsWithTimestamps,
+          'migration_complete': hasReadingsCreatedAt && hasReadingsUpdatedAt,
+        },
+        'payments': {
+          'has_created_at': hasPaymentsCreatedAt,
+          'has_updated_at': hasPaymentsUpdatedAt,
+          'total_records': totalPayments,
+          'migration_complete': hasPaymentsCreatedAt && hasPaymentsUpdatedAt,
+        },
+        'overall_migration_needed':
+            !hasReadingsCreatedAt ||
+            !hasReadingsUpdatedAt ||
+            !hasPaymentsCreatedAt ||
+            !hasPaymentsUpdatedAt,
+        'overall_migration_complete':
+            hasReadingsCreatedAt &&
+            hasReadingsUpdatedAt &&
+            hasPaymentsCreatedAt &&
+            hasPaymentsUpdatedAt,
+      };
+    } catch (e) {
+      print('Erro ao verificar status da migração: $e');
+      return {'error': e.toString()};
+    }
   }
 
   // ===== MÉTODOS UTILITÁRIOS =====
@@ -349,6 +605,82 @@ class DatabaseService {
     } catch (e) {
       print('Erro ao obter estatísticas: $e');
       return {};
+    }
+  }
+
+  // Obter informações detalhadas das tabelas
+  Future<Map<String, dynamic>> getTableInfo() async {
+    try {
+      final db = await database;
+      final tables = ['users', 'clients', 'readings', 'payments'];
+      final tableInfo = <String, dynamic>{};
+
+      for (final table in tables) {
+        final info = await db.rawQuery("PRAGMA table_info($table)");
+        final count = await countRecords(table);
+
+        tableInfo[table] = {
+          'columns':
+              info
+                  .map(
+                    (col) => {
+                      'name': col['name'],
+                      'type': col['type'],
+                      'not_null': col['notnull'] == 1,
+                      'primary_key': col['pk'] == 1,
+                    },
+                  )
+                  .toList(),
+          'record_count': count,
+        };
+      }
+
+      return tableInfo;
+    } catch (e) {
+      print('Erro ao obter informações das tabelas: $e');
+      return {};
+    }
+  }
+
+  // Verificar integridade da base de dados
+  Future<bool> checkDatabaseIntegrity() async {
+    try {
+      final db = await database;
+
+      // Verificar integridade
+      final integrity = await db.rawQuery('PRAGMA integrity_check');
+      final isOk = integrity.isNotEmpty && integrity.first.values.first == 'ok';
+
+      if (isOk) {
+        print('✅ Integridade da base de dados OK');
+      } else {
+        print('❌ Problemas de integridade encontrados: $integrity');
+      }
+
+      return isOk;
+    } catch (e) {
+      print('Erro ao verificar integridade: $e');
+      return false;
+    }
+  }
+
+  // Otimizar base de dados
+  Future<void> optimizeDatabase() async {
+    try {
+      final db = await database;
+
+      print('🔄 Otimizando base de dados...');
+
+      // VACUUM para otimizar espaço
+      await db.execute('VACUUM');
+
+      // ANALYZE para otimizar consultas
+      await db.execute('ANALYZE');
+
+      print('✅ Base de dados otimizada');
+    } catch (e) {
+      print('Erro ao otimizar base de dados: $e');
+      rethrow;
     }
   }
 

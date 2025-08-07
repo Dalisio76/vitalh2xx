@@ -11,13 +11,23 @@ class ClientFormView extends GetView<ClientController> {
   Widget build(BuildContext context) {
     final ClientModel? client = Get.arguments as ClientModel?;
     final bool isEditing = client != null;
+    final _formKey = GlobalKey<FormState>();
 
-    // Se está editando, seleciona o cliente
-    if (isEditing) {
-      controller.selectClient(client);
-    } else {
-      controller.clearForm();
-    }
+    // Controllers para os campos de texto
+    final nameController = TextEditingController();
+    final contactController = TextEditingController();
+    final referenceController = TextEditingController();
+    final counterNumberController = TextEditingController();
+
+    // Inicialização e listeners
+    _initializeForm(
+      isEditing,
+      client,
+      nameController,
+      contactController,
+      referenceController,
+      counterNumberController,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -25,31 +35,86 @@ class ClientFormView extends GetView<ClientController> {
         backgroundColor: Colors.blue[600],
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPersonalInfoSection(),
-            const SizedBox(height: 20),
-            _buildContactInfoSection(),
-            const SizedBox(height: 20),
-            _buildTechnicalInfoSection(),
-            const SizedBox(height: 20),
-            if (isEditing) ...[
-              _buildStatusSection(client),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPersonalInfoSection(nameController),
               const SizedBox(height: 20),
+              _buildContactInfoSection(contactController),
+              const SizedBox(height: 20),
+              _buildTechnicalInfoSection(
+                referenceController,
+                counterNumberController,
+              ),
+              const SizedBox(height: 20),
+              if (isEditing) ...[
+                _buildStatusSection(client),
+                const SizedBox(height: 20),
+              ],
+              _buildValidationInfo(),
+              const SizedBox(height: 30),
+              _buildActionButtons(
+                isEditing,
+                client,
+                _formKey,
+                nameController,
+                contactController,
+                referenceController,
+                counterNumberController,
+              ),
             ],
-            _buildValidationInfo(),
-            const SizedBox(height: 30),
-            _buildActionButtons(isEditing, client),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildPersonalInfoSection() {
+  void _initializeForm(
+    bool isEditing,
+    ClientModel? client,
+    TextEditingController nameController,
+    TextEditingController contactController,
+    TextEditingController referenceController,
+    TextEditingController counterNumberController,
+  ) {
+    if (isEditing && client != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.selectClient(client);
+        nameController.text = client.name;
+        contactController.text = client.contact;
+        referenceController.text = client.reference;
+        counterNumberController.text = client.counterNumber;
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.clearForm();
+        nameController.clear();
+        contactController.clear();
+        referenceController.clear();
+        counterNumberController.clear();
+      });
+    }
+
+    // Listeners para sincronizar com o controller
+    nameController.addListener(() {
+      controller.name.value = nameController.text;
+    });
+    contactController.addListener(() {
+      controller.contact.value = contactController.text;
+    });
+    referenceController.addListener(() {
+      controller.reference.value = referenceController.text;
+    });
+    counterNumberController.addListener(() {
+      controller.counterNumber.value = counterNumberController.text;
+    });
+  }
+
+  Widget _buildPersonalInfoSection(TextEditingController nameController) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -67,19 +132,16 @@ class ClientFormView extends GetView<ClientController> {
               ],
             ),
             const SizedBox(height: 16),
-            Obx(
-              () => TextFormField(
-                initialValue: controller.name.value,
-                decoration: const InputDecoration(
-                  labelText: 'Nome Completo *',
-                  hintText: 'Digite o nome do cliente',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: controller.validateName,
-                onChanged: (value) => controller.name.value = value,
+            TextFormField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nome Completo *',
+                hintText: 'Digite o nome do cliente',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person_outline),
               ),
+              textCapitalization: TextCapitalization.words,
+              validator: controller.validateName,
             ),
           ],
         ),
@@ -87,7 +149,7 @@ class ClientFormView extends GetView<ClientController> {
     );
   }
 
-  Widget _buildContactInfoSection() {
+  Widget _buildContactInfoSection(TextEditingController contactController) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -105,23 +167,20 @@ class ClientFormView extends GetView<ClientController> {
               ],
             ),
             const SizedBox(height: 16),
-            Obx(
-              () => TextFormField(
-                initialValue: controller.contact.value,
-                decoration: const InputDecoration(
-                  labelText: 'Contacto *',
-                  hintText: '+258 XX XXX XXXX',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
-                ),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]')),
-                  LengthLimitingTextInputFormatter(15),
-                ],
-                validator: controller.validateContact,
-                onChanged: (value) => controller.contact.value = value,
+            TextFormField(
+              controller: contactController,
+              decoration: const InputDecoration(
+                labelText: 'Contacto *',
+                hintText: '+258 XX XXX XXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone),
               ),
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]')),
+                LengthLimitingTextInputFormatter(15),
+              ],
+              validator: controller.validateContact,
             ),
           ],
         ),
@@ -129,7 +188,10 @@ class ClientFormView extends GetView<ClientController> {
     );
   }
 
-  Widget _buildTechnicalInfoSection() {
+  Widget _buildTechnicalInfoSection(
+    TextEditingController referenceController,
+    TextEditingController counterNumberController,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -150,41 +212,35 @@ class ClientFormView extends GetView<ClientController> {
             Row(
               children: [
                 Expanded(
-                  child: Obx(
-                    () => TextFormField(
-                      initialValue: controller.reference.value,
-                      decoration: const InputDecoration(
-                        labelText: 'Referência *',
-                        hintText: 'Ex: CLI001',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.tag),
-                      ),
-                      textCapitalization: TextCapitalization.characters,
-                      validator: controller.validateReference,
-                      onChanged: (value) => controller.reference.value = value,
+                  child: TextFormField(
+                    controller: referenceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Referência *',
+                      hintText: 'Ex: CLI001',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.tag),
                     ),
+                    textCapitalization: TextCapitalization.characters,
+                    validator: controller.validateReference,
                   ),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () => _generateReference(),
+                  onPressed: () => _generateReference(referenceController),
                   child: const Text('Gerar'),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Obx(
-              () => TextFormField(
-                initialValue: controller.counterNumber.value,
-                decoration: const InputDecoration(
-                  labelText: 'Número do Contador *',
-                  hintText: 'Ex: 123456789',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.electrical_services),
-                ),
-                validator: controller.validateCounterNumber,
-                onChanged: (value) => controller.counterNumber.value = value,
+            TextFormField(
+              controller: counterNumberController,
+              decoration: const InputDecoration(
+                labelText: 'Número do Contador *',
+                hintText: 'Ex: 123456789',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.electrical_services),
               ),
+              validator: controller.validateCounterNumber,
             ),
           ],
         ),
@@ -410,25 +466,86 @@ class ClientFormView extends GetView<ClientController> {
     );
   }
 
-  Widget _buildActionButtons(bool isEditing, ClientModel? client) {
+  Widget _buildActionButtons(
+    bool isEditing,
+    ClientModel? client,
+    GlobalKey<FormState> formKey,
+    TextEditingController nameController,
+    TextEditingController contactController,
+    TextEditingController referenceController,
+    TextEditingController counterNumberController,
+  ) {
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           height: 50,
-          child: ElevatedButton.icon(
-            onPressed:
-                () =>
-                    isEditing
-                        ? controller.updateClient(client!.id!)
-                        : controller.createClient(),
-            icon: Icon(isEditing ? Icons.update : Icons.save),
-            label: Text(isEditing ? 'Atualizar Cliente' : 'Salvar Cliente'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[600],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          child: Obx(
+            () => ElevatedButton.icon(
+              onPressed:
+                  controller.isLoading
+                      ? null
+                      : () async {
+                        if (formKey.currentState!.validate()) {
+                          bool success;
+                          if (isEditing) {
+                            success = await controller.updateClient(
+                              client!.id!,
+                            );
+                          } else {
+                            success = await controller.createClient();
+                            // Limpa os campos apenas em cadastro novo e se foi bem-sucedido
+                            if (success) {
+                              _clearAllFields(
+                                nameController,
+                                contactController,
+                                referenceController,
+                                counterNumberController,
+                              );
+                            }
+                          }
+                        } else {
+                          Get.snackbar(
+                            'Atenção',
+                            'Por favor, preencha todos os campos obrigatórios',
+                            snackPosition: SnackPosition.TOP,
+                            backgroundColor: Colors.orange[100],
+                            colorText: Colors.orange[800],
+                            icon: const Icon(
+                              Icons.warning,
+                              color: Colors.orange,
+                            ),
+                          );
+                        }
+                      },
+              icon:
+                  controller.isLoading
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                      : Icon(isEditing ? Icons.update : Icons.save),
+              label: Text(
+                controller.isLoading
+                    ? controller.loadingMessage.isNotEmpty
+                        ? controller.loadingMessage
+                        : 'Salvando...'
+                    : isEditing
+                    ? 'Atualizar Cliente'
+                    : 'Salvar Cliente',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[600],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
@@ -438,7 +555,15 @@ class ClientFormView extends GetView<ClientController> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => controller.clearForm(),
+                onPressed: () {
+                  _clearAllFields(
+                    nameController,
+                    contactController,
+                    referenceController,
+                    counterNumberController,
+                  );
+                  controller.clearForm();
+                },
                 icon: const Icon(Icons.clear),
                 label: const Text('Limpar'),
               ),
@@ -488,11 +613,23 @@ class ClientFormView extends GetView<ClientController> {
     );
   }
 
-  void _generateReference() {
-    // Gera uma referência automática baseada no timestamp
+  void _clearAllFields(
+    TextEditingController nameController,
+    TextEditingController contactController,
+    TextEditingController referenceController,
+    TextEditingController counterNumberController,
+  ) {
+    nameController.clear();
+    contactController.clear();
+    referenceController.clear();
+    counterNumberController.clear();
+  }
+
+  void _generateReference(TextEditingController referenceController) {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     final reference = 'CLI${timestamp.substring(timestamp.length - 6)}';
     controller.reference.value = reference;
+    referenceController.text = reference;
   }
 
   void _previewClient(bool isEditing, ClientModel? client) {
@@ -505,7 +642,7 @@ class ClientFormView extends GetView<ClientController> {
 
     Get.bottomSheet(
       Container(
-        height: Get.height * 0.7,
+        height: Get.height * 0.6,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -528,20 +665,20 @@ class ClientFormView extends GetView<ClientController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const Divider(),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
                       CircleAvatar(
-                        radius: 40,
+                        radius: 30,
                         backgroundColor: Colors.blue[100],
                         child: Text(
                           previewData['name']!.isNotEmpty
                               ? previewData['name']![0].toUpperCase()
                               : '?',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.blue[800],
                           ),
@@ -549,63 +686,34 @@ class ClientFormView extends GetView<ClientController> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        previewData['name']!,
+                        previewData['name']!.isNotEmpty
+                            ? previewData['name']!
+                            : 'Nome não informado',
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
-                      _buildPreviewCard(
-                        'Informações de Contacto',
-                        [
-                          _buildPreviewRow(
-                            'Contacto',
-                            previewData['contact']!.isNotEmpty
-                                ? previewData['contact']!
-                                : 'Não informado',
-                          ),
-                        ],
-                        Icons.contact_phone,
-                        Colors.green,
+                      _buildPreviewItem('Contacto', previewData['contact']!),
+                      _buildPreviewItem(
+                        'Referência',
+                        previewData['reference']!,
                       ),
-                      const SizedBox(height: 16),
-                      _buildPreviewCard(
-                        'Informações Técnicas',
-                        [
-                          _buildPreviewRow(
-                            'Referência',
-                            previewData['reference']!,
-                          ),
-                          _buildPreviewRow(
-                            'Número do Contador',
-                            previewData['counterNumber']!,
-                          ),
-                        ],
-                        Icons.engineering,
-                        Colors.orange,
+                      _buildPreviewItem(
+                        'Contador',
+                        previewData['counterNumber']!,
                       ),
                       if (isEditing && client != null) ...[
-                        const SizedBox(height: 16),
-                        _buildPreviewCard(
-                          'Informações do Sistema',
-                          [
-                            _buildPreviewRow(
-                              'Status',
-                              client.isActive ? 'Ativo' : 'Inativo',
-                            ),
-                            _buildPreviewRow(
-                              'Dívida Total',
-                              '${client.totalDebt.toStringAsFixed(2)} MT',
-                            ),
-                            _buildPreviewRow(
-                              'Data de Cadastro',
-                              _formatDate(client.createdAt),
-                            ),
-                          ],
-                          Icons.info,
-                          Colors.purple,
+                        const Divider(),
+                        _buildPreviewItem(
+                          'Status',
+                          client.isActive ? 'Ativo' : 'Inativo',
+                        ),
+                        _buildPreviewItem(
+                          'Dívida',
+                          '${client.totalDebt.toStringAsFixed(2)} MT',
                         ),
                       ],
                     ],
@@ -619,54 +727,24 @@ class ClientFormView extends GetView<ClientController> {
     );
   }
 
-  Widget _buildPreviewCard(
-    String title,
-    List<Widget> children,
-    IconData icon,
-    Color color,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreviewRow(String label, String value) {
+  Widget _buildPreviewItem(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 100,
             child: Text(
               '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(
+              value.isNotEmpty ? value : 'Não informado',
+              style: TextStyle(color: value.isEmpty ? Colors.grey : null),
+            ),
+          ),
         ],
       ),
     );
