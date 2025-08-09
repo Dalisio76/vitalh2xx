@@ -8,6 +8,7 @@ import 'package:vitalh2x/controlers/client_controller.dart';
 import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/controlers/reading_controller.dart';
 import 'package:vitalh2x/controlers/report_controller.dart';
+import 'package:vitalh2x/routs/rout.dart';
 import 'package:vitalh2x/widgets/dashboard_card.dart';
 import 'package:vitalh2x/widgets/simple_bar_chart.dart';
 
@@ -218,7 +219,8 @@ class DashboardView extends StatelessWidget {
                       '${clientController.stats['with_debt'] ?? 0} clientes',
                       Icons.warning,
                       Colors.red,
-                      () => Get.toNamed('/reports/debt'),
+                      // () => Get.toNamed('/reports/debt'),
+                      () => Get.toNamed(Routes.HOME),
                     ),
 
                     _buildInsightTile(

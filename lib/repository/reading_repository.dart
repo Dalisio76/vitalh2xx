@@ -122,7 +122,7 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
   }) async {
     final data = <String, dynamic>{
       'payment_status': status.index,
-      'updated_at': DateTime.now().toIso8601String(),
+      //  'updated_at': DateTime.now().toIso8601String(),
     };
 
     if (paymentDate != null) {

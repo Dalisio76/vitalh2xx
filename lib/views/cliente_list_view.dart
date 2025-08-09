@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/controlers/client_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
+import 'package:vitalh2x/routs/rout.dart';
 
 class ClientListView extends GetView<ClientController> {
   const ClientListView({Key? key}) : super(key: key);
@@ -285,7 +286,7 @@ class ClientListView extends GetView<ClientController> {
       elevation: hasDebt ? 3 : 1,
       color: isInactive ? Colors.grey[100] : null,
       child: InkWell(
-        onTap: () => Get.toNamed('/client-detail', arguments: client),
+        onTap: () => Get.toNamed(Routes.CLIENT_DETAIL, arguments: client),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(16),
