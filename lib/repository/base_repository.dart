@@ -16,7 +16,7 @@ abstract class BaseRepository<T> {
     final id = DatabaseHelper.generateId();
     final data = toMap(model);
     data['id'] = id;
-    data['created_at'] = DateTime.now().toIso8601String();
+    // data['created_at'] = DateTime.now().toIso8601String();
 
     await databaseProvider.insert(tableName, data);
     return id;

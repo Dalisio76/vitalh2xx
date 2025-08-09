@@ -7,8 +7,8 @@ class DatabaseConstants {
 
   // Colunas comuns
   static const String id = 'id';
-  static const String createdAt = 'created_at';
-  static const String updatedAt = 'updated_at';
+  // static const String createdAt = 'created_at';
+  // static const String updatedAt = 'updated_at';
   static const String isSynced = 'is_synced';
 
   // Colunas da tabela users

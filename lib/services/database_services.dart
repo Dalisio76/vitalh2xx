@@ -116,8 +116,6 @@ class DatabaseService {
           notes TEXT,
           user_id TEXT NOT NULL,
           is_synced INTEGER NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL,
-          updated_at TEXT,
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
           FOREIGN KEY (reading_id) REFERENCES readings (id) ON DELETE CASCADE,
           FOREIGN KEY (user_id) REFERENCES users (id)

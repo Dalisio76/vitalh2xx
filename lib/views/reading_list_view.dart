@@ -4,6 +4,7 @@ import 'package:vitalh2x/controlers/reading_controller.dart';
 import 'package:vitalh2x/models/leitura_model.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/metodo_pagamento_model.dart';
+import 'package:vitalh2x/routs/rout.dart';
 
 class ReadingListView extends GetView<ReadingController> {
   const ReadingListView({Key? key}) : super(key: key);
@@ -39,7 +40,7 @@ class ReadingListView extends GetView<ReadingController> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Get.toNamed('/reading-form'),
+        onPressed: () => Get.toNamed(Routes.READING_FORM),
         icon: const Icon(Icons.speed),
         label: const Text('Nova Leitura'),
         backgroundColor: Colors.blue[600],
@@ -233,7 +234,7 @@ class ReadingListView extends GetView<ReadingController> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => Get.toNamed('/reading-form'),
+            onPressed: () => Get.toNamed(Routes.READING_FORM),
             icon: const Icon(Icons.add),
             label: const Text('Primeira Leitura'),
           ),
@@ -489,7 +490,7 @@ class ReadingListView extends GetView<ReadingController> {
                   onTap: () {
                     Get.back();
                     controller.selectReading(reading);
-                    Get.toNamed('/reading-form');
+                    Get.toNamed(Routes.READING_FORM);
                   },
                 ),
                 ListTile(
@@ -912,7 +913,7 @@ class ReadingListView extends GetView<ReadingController> {
   // Action methods
   void _processPayment(ReadingModel reading) {
     // Navigate to payment form with pre-selected reading
-    Get.toNamed('/payment-form', arguments: reading);
+    Get.toNamed(Routes.PAYMENT_FORM, arguments: reading);
   }
 
   void _printBill(ReadingModel reading) {
@@ -921,7 +922,7 @@ class ReadingListView extends GetView<ReadingController> {
   }
 
   void _viewClient(String clientId) {
-    Get.toNamed('/client-detail', arguments: clientId);
+    Get.toNamed(Routes.CLIENT_DETAIL, arguments: clientId);
   }
 
   // Helper methods

@@ -1,4 +1,4 @@
-// ===== READING CONTROLLER =====
+// ===== READING CONTROLLER CORRIGIDO =====
 // lib/app/controllers/reading_controller.dart
 
 import 'package:get/get.dart';
@@ -44,6 +44,9 @@ class ReadingController extends BaseController {
 
   // Statistics
   final RxMap<String, dynamic> monthlyStats = <String, dynamic>{}.obs;
+
+  // Estado do formulário
+  final RxBool isEditing = false.obs;
 
   @override
   void onInit() {
@@ -110,11 +113,12 @@ class ReadingController extends BaseController {
     }
   }
 
-  // Find client by reference
+  // Find client by reference - MÉTODO CORRIGIDO
   Future<void> findClientByReference() async {
     try {
       if (clientReference.value.trim().isEmpty) {
         selectedClient.value = null;
+        _resetForm();
         return;
       }
 
@@ -127,6 +131,7 @@ class ReadingController extends BaseController {
       if (client == null) {
         showError('Cliente não encontrado');
         selectedClient.value = null;
+        _resetForm();
         hideLoading();
         return;
       }
@@ -134,13 +139,14 @@ class ReadingController extends BaseController {
       if (!client.isActive) {
         showError('Cliente está desativado');
         selectedClient.value = null;
+        _resetForm();
         hideLoading();
         return;
       }
 
       selectedClient.value = client;
 
-      // Check if reading already exists for this month
+      // Verificar se já existe leitura para este mês
       final existingReading = await _readingRepository.findByClientAndMonth(
         client.id!,
         currentMonth.value,
@@ -148,40 +154,98 @@ class ReadingController extends BaseController {
       );
 
       if (existingReading != null) {
-        showError('Leitura já existe para este cliente neste mês');
-        selectedReading.value = existingReading;
-        currentReading.value = existingReading.currentReading;
-        hideLoading();
-        return;
+        // MODO EDIÇÃO - leitura já existe
+        showSuccess('Leitura encontrada para edição');
+        _setupEditMode(existingReading);
+      } else {
+        // MODO NOVA LEITURA
+        showSuccess('Cliente encontrado: ${client.name}');
+        await _setupNewReadingMode(client);
       }
 
-      // Get last reading
-      final lastReading = await _readingRepository.findLastReadingByClient(
-        client.id!,
-      );
-      previousReading.value = lastReading?.currentReading ?? 0.0;
-
       hideLoading();
-      showSuccess('Cliente encontrado: ${client.name}');
     } catch (e) {
       handleException(e);
     }
   }
 
-  // Calculate consumption and bill amount
-  void _calculateValues() {
-    consumption.value = currentReading.value - previousReading.value;
-    billAmount.value = consumption.value * AppConfig.pricePerCubicMeter;
+  // Setup para nova leitura - MÉTODO NOVO
+  Future<void> _setupNewReadingMode(ClientModel client) async {
+    try {
+      isEditing.value = false;
+      selectedReading.value = null;
+
+      // Buscar última leitura para pegar leitura anterior
+      final lastReading = await _readingRepository.findLastReadingByClient(
+        client.id!,
+      );
+
+      previousReading.value = lastReading?.currentReading ?? 0.0;
+      currentReading.value = 0.0;
+      notes.value = '';
+
+      _calculateValues();
+    } catch (e) {
+      print('Erro ao configurar nova leitura: $e');
+      previousReading.value = 0.0;
+    }
   }
 
-  // Create reading
+  // Setup para modo edição - MÉTODO NOVO
+  void _setupEditMode(ReadingModel reading) {
+    isEditing.value = true;
+    selectedReading.value = reading;
+    currentReading.value = reading.currentReading;
+    previousReading.value = reading.previousReading;
+    notes.value = reading.notes ?? '';
+    _calculateValues();
+  }
+
+  // Reset form - MÉTODO NOVO
+  void _resetForm() {
+    isEditing.value = false;
+    selectedReading.value = null;
+    currentReading.value = 0.0;
+    previousReading.value = 0.0;
+    consumption.value = 0.0;
+    billAmount.value = 0.0;
+    notes.value = '';
+  }
+
+  // Calculate consumption and bill amount
+  void _calculateValues() {
+    if (currentReading.value > previousReading.value) {
+      consumption.value = currentReading.value - previousReading.value;
+      billAmount.value = consumption.value * AppConfig.pricePerCubicMeter;
+    } else {
+      consumption.value = 0.0;
+      billAmount.value = 0.0;
+    }
+  }
+
+  // Create reading - MÉTODO CORRIGIDO
   Future<void> createReading() async {
     try {
       if (!_validateForm()) return;
 
       showLoading('Registrando leitura...');
 
+      // Verificar novamente se não existe (segurança extra)
+      final existingCheck = await _readingRepository.findByClientAndMonth(
+        selectedClient.value!.id!,
+        currentMonth.value,
+        currentYear.value,
+      );
+
+      if (existingCheck != null) {
+        showError('Já existe leitura para este cliente neste mês');
+        hideLoading();
+        return;
+      }
+
+      // Criar nova leitura SEM ID (será gerado automaticamente)
       final reading = ReadingModel(
+        // NÃO definir ID - deixar null para gerar automaticamente
         clientId: selectedClient.value!.id!,
         month: currentMonth.value,
         year: currentYear.value,
@@ -193,6 +257,7 @@ class ReadingController extends BaseController {
         notes: notes.value.trim().isEmpty ? null : notes.value.trim(),
       );
 
+      // Salvar usando repository
       await _readingRepository.create(reading);
 
       // Update client's last reading
@@ -201,33 +266,50 @@ class ReadingController extends BaseController {
         currentReading.value,
       );
 
+      // Limpar formulário e recarregar dados
       clearForm();
       await loadMonthlyReadings();
       await loadPendingBills();
       await loadMonthlyStats();
 
+      hideLoading();
       showSuccess('Leitura registrada com sucesso!');
+
+      // Aguardar um pouco para mostrar a mensagem
+      await Future.delayed(const Duration(milliseconds: 1500));
       Get.back();
     } catch (e) {
+      hideLoading();
       handleException(e);
     }
   }
 
-  // Update reading
-  Future<void> updateReading(String readingId) async {
+  // Update reading - MÉTODO CORRIGIDO
+  Future<void> updateReading() async {
     try {
       if (!_validateForm()) return;
+      if (selectedReading.value == null) {
+        showError('Nenhuma leitura selecionada para edição');
+        return;
+      }
 
       showLoading('Atualizando leitura...');
 
-      final reading = selectedReading.value!.copyWith(
-        currentReading: currentReading.value,
-        consumption: consumption.value,
-        billAmount: billAmount.value,
-        notes: notes.value.trim().isEmpty ? null : notes.value.trim(),
-      );
+      // ✅ USAR O DATABASEPROVIDER DO PRÓPRIO REPOSITORY
+      final updateData = <String, dynamic>{
+        'current_reading': currentReading.value,
+        'consumption': consumption.value,
+        'bill_amount': billAmount.value,
+        'notes': notes.value.trim().isEmpty ? null : notes.value.trim(),
+      };
 
-      await _readingRepository.update(readingId, reading);
+      // ✅ ACESSAR DATABASEPROVIDER DIRETAMENTE
+      await _readingRepository.databaseProvider.update(
+        'readings',
+        updateData,
+        where: 'id = ?',
+        whereArgs: [selectedReading.value!.id!],
+      );
 
       // Update client's last reading
       await _clientRepository.updateLastReading(
@@ -239,10 +321,23 @@ class ReadingController extends BaseController {
       await loadMonthlyReadings();
       await loadMonthlyStats();
 
+      hideLoading();
       showSuccess('Leitura atualizada com sucesso!');
+
+      await Future.delayed(const Duration(milliseconds: 1500));
       Get.back();
     } catch (e) {
+      hideLoading();
       handleException(e);
+    }
+  }
+
+  // Método unificado para salvar - NOVO
+  Future<void> saveReading() async {
+    if (isEditing.value) {
+      await updateReading();
+    } else {
+      await createReading();
     }
   }
 
@@ -253,6 +348,7 @@ class ReadingController extends BaseController {
       currentReading.value = reading.currentReading;
       previousReading.value = reading.previousReading;
       notes.value = reading.notes ?? '';
+      isEditing.value = true;
 
       // Load client info
       final client = await _clientRepository.findById(reading.clientId);
@@ -287,7 +383,7 @@ class ReadingController extends BaseController {
     }
   }
 
-  // Clear form
+  // Clear form - MÉTODO CORRIGIDO
   void clearForm() {
     clientReference.value = '';
     currentReading.value = 0.0;
@@ -297,6 +393,7 @@ class ReadingController extends BaseController {
     billAmount.value = 0.0;
     selectedClient.value = null;
     selectedReading.value = null;
+    isEditing.value = false;
   }
 
   // Form validation
@@ -358,4 +455,11 @@ class ReadingController extends BaseController {
 
   // Get formatted bill amount
   String get formattedBillAmount => '${billAmount.value.toStringAsFixed(2)} MT';
+
+  // Get form title
+  String get formTitle => isEditing.value ? 'Editar Leitura' : 'Nova Leitura';
+
+  // Get save button text
+  String get saveButtonText =>
+      isEditing.value ? 'Atualizar Leitura' : 'Salvar Leitura';
 }

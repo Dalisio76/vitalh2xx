@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/pagamento_model.dart';
+import 'package:vitalh2x/routs/rout.dart';
 
 class PaymentListView extends GetView<PaymentController> {
   const PaymentListView({Key? key}) : super(key: key);
@@ -33,7 +34,7 @@ class PaymentListView extends GetView<PaymentController> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Get.toNamed('/payment-form'),
+        onPressed: () => Get.toNamed(Routes.PAYMENT_FORM),
         icon: const Icon(Icons.payment),
         label: const Text('Novo Pagamento'),
         backgroundColor: Colors.green[600],
@@ -181,7 +182,7 @@ class PaymentListView extends GetView<PaymentController> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => Get.toNamed('/payment-form'),
+            onPressed: () => Get.toNamed(Routes.PAYMENT_FORM),
             icon: const Icon(Icons.add),
             label: const Text('Primeiro Pagamento'),
           ),
@@ -799,7 +800,7 @@ class PaymentListView extends GetView<PaymentController> {
 
   void _viewClient(String? clientId) {
     if (clientId != null) {
-      Get.toNamed('/client-detail', arguments: clientId);
+      Get.toNamed(Routes.CLIENT_DETAIL, arguments: clientId);
     }
   }
 
