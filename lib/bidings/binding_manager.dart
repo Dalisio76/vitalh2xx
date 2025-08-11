@@ -13,6 +13,7 @@ import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/controlers/reading_controller.dart';
 import 'package:vitalh2x/controlers/report_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
+import 'package:vitalh2x/models/usuario_model.dart';
 
 class BindingManager {
   // Get appropriate binding based on user role

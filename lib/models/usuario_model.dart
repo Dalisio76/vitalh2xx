@@ -1,15 +1,34 @@
 // ===== USER MODEL =====
 // lib/app/data/models/user_model.dart
 
-import 'package:vitalh2x/models/cliente_model.dart';
+// Enum UserRole (movido de cliente_model.dart)
+enum UserRole {
+  admin,          // Administrador
+  cashier,        // Caixa
+  fieldOperator   // Operador Campo
+}
+
+// Extension para UserRole
+extension UserRoleExtension on UserRole {
+  String get displayName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Administrador';
+      case UserRole.cashier:
+        return 'Caixa';
+      case UserRole.fieldOperator:
+        return 'Operador de Campo';
+    }
+  }
+}
 
 class UserModel {
   final String? id;
   final String name;
   final String email;
-  final String phone;
+  final String? phone;
   final UserRole role;
-  final String passwordHash;
+  final String? passwordHash;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final DateTime? lastLogin;
@@ -20,9 +39,9 @@ class UserModel {
     this.id,
     required this.name,
     required this.email,
-    required this.phone,
+    this.phone,
     required this.role,
-    required this.passwordHash,
+    this.passwordHash,
     required this.createdAt,
     this.updatedAt,
     this.lastLogin,

@@ -56,7 +56,7 @@ class UserRepository extends BaseRepository<UserModel> {
   }
 
   // Buscar usuários por role
-  Future<List<UserModel>> findByRole(UserRole role) async {
+  Future<List<UserModel>> findByRole(role) async {
     final results = await databaseProvider.query(
       tableName,
       where: 'role = ? AND is_active = 1',

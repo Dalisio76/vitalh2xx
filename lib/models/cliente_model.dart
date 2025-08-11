@@ -14,6 +14,7 @@ class ClientModel {
   final bool isActive;
   final double? lastReading;
   final double totalDebt;
+  final bool isSynced;
 
   ClientModel({
     this.id,
@@ -26,6 +27,7 @@ class ClientModel {
     this.isActive = true,
     this.lastReading,
     this.totalDebt = 0.0,
+    this.isSynced = false,
   });
 
   // Converter para Map (para SQLite)
@@ -41,6 +43,7 @@ class ClientModel {
       'is_active': isActive ? 1 : 0,
       'last_reading': lastReading,
       'total_debt': totalDebt,
+      'is_synced': isSynced ? 1 : 0,
     };
   }
 
@@ -58,10 +61,11 @@ class ClientModel {
       isActive: map['is_active'] == 1,
       lastReading: map['last_reading']?.toDouble(),
       totalDebt: map['total_debt']?.toDouble() ?? 0.0,
+      isSynced: map['is_synced'] == 1,
     );
   }
 
-  // Converter para JSON (para Supabase)
+  // Converter para JSON (para API)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -74,6 +78,7 @@ class ClientModel {
       'is_active': isActive,
       'last_reading': lastReading,
       'total_debt': totalDebt,
+      'is_synced': isSynced,
     };
   }
 
@@ -93,6 +98,7 @@ class ClientModel {
       isActive: json['is_active'] ?? true,
       lastReading: json['last_reading']?.toDouble(),
       totalDebt: json['total_debt']?.toDouble() ?? 0.0,
+      isSynced: json['is_synced'] ?? false,
     );
   }
 
@@ -108,6 +114,7 @@ class ClientModel {
     bool? isActive,
     double? lastReading,
     double? totalDebt,
+    bool? isSynced,
   }) {
     return ClientModel(
       id: id ?? this.id,
@@ -120,6 +127,7 @@ class ClientModel {
       isActive: isActive ?? this.isActive,
       lastReading: lastReading ?? this.lastReading,
       totalDebt: totalDebt ?? this.totalDebt,
+      isSynced: isSynced ?? this.isSynced,
     );
   }
 
@@ -135,12 +143,6 @@ enum PaymentMethod {
   mobileMoney, // M-Pesa, E-Mola, etc.
   check, // Cheque
   other, // Outros
-}
-
-enum UserRole {
-  admin, // Administrador (acesso total)
-  cashier, // Caixa/Atendimento (pagamentos + cadastros)
-  fieldOperator, // Operador de Campo (só leituras)
 }
 
 // Extensions para melhor uso
@@ -175,19 +177,6 @@ extension PaymentMethodExtension on PaymentMethod {
         return 'Cheque';
       case PaymentMethod.other:
         return 'Outros';
-    }
-  }
-}
-
-extension UserRoleExtension on UserRole {
-  String get displayName {
-    switch (this) {
-      case UserRole.admin:
-        return 'Administrador';
-      case UserRole.cashier:
-        return 'Caixa';
-      case UserRole.fieldOperator:
-        return 'Operador de Campo';
     }
   }
 }

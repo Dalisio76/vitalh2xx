@@ -4,6 +4,7 @@
 import 'package:get/get.dart';
 import 'package:vitalh2x/bidings/dependency_injection.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
+import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/routs/rout.dart';
 
 class RouteHelper {

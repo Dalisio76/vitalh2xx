@@ -4,6 +4,8 @@
 import 'package:vitalh2x/services/database_services.dart';
 
 abstract class DatabaseProvider {
+  Future<void> initialize();
+  
   Future<List<Map<String, dynamic>>> query(
     String table, {
     bool? distinct,
@@ -25,10 +27,18 @@ abstract class DatabaseProvider {
     List<dynamic>? whereArgs,
   });
   Future<int> delete(String table, {String? where, List<dynamic>? whereArgs});
+  
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<dynamic>? arguments]);
 }
 
 class SQLiteDatabaseProvider implements DatabaseProvider {
   final DatabaseService _databaseService = DatabaseService();
+
+  @override
+  Future<void> initialize() async {
+    // Inicializar banco de dados (já é feito automaticamente no DatabaseService)
+    await _databaseService.database;
+  }
 
   @override
   Future<List<Map<String, dynamic>>> query(
@@ -86,6 +96,7 @@ class SQLiteDatabaseProvider implements DatabaseProvider {
   }
 
   // Métodos específicos para operações complexas
+  @override
   Future<List<Map<String, dynamic>>> rawQuery(
     String sql, [
     List<dynamic>? arguments,
