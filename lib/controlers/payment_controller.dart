@@ -12,7 +12,10 @@ import 'package:vitalh2x/repository/cliente_repository.dart';
 import 'package:vitalh2x/repository/payment_repository.dart';
 import 'package:vitalh2x/repository/reading_repository.dart';
 import 'package:vitalh2x/services/database_providers.dart';
+import 'package:vitalh2x/services/print_service.dart';
+import 'package:vitalh2x/routs/rout.dart';
 import 'auth_controller.dart';
+import 'reading_controller.dart';
 
 class PaymentController extends BaseController {
   final PaymentRepository _paymentRepository = PaymentRepository(
@@ -59,6 +62,78 @@ class PaymentController extends BaseController {
     loadPendingBills();
     loadPaymentStats();
     generateReceiptNumber();
+    // Atrasar a verificação de dados pré-carregados para garantir que os argumentos estão disponíveis
+    Future.delayed(Duration(milliseconds: 100), () {
+      _checkForPreloadedData();
+    });
+  }
+
+  // Check if data was pre-loaded from reading list
+  void _checkForPreloadedData() {
+    final arguments = Get.arguments;
+    
+    if (arguments != null && arguments is Map) {
+      final isPreloaded = arguments['preloaded'] as bool? ?? false;
+      
+      if (isPreloaded) {
+        final reading = arguments['reading'] as ReadingModel?;
+        final client = arguments['client'] as ClientModel?;
+        
+        if (reading != null && client != null) {
+          loadPreloadedData(client, reading);
+        } else if (reading != null) {
+          // Carregar cliente a partir da leitura
+          loadPreloadedDataFromReading(reading);
+        }
+      }
+    }
+  }
+
+  // Load pre-loaded data when only reading is provided
+  void loadPreloadedDataFromReading(ReadingModel reading) async {
+    try {
+      showLoading('Carregando dados do cliente...');
+      
+      // Buscar cliente pela reading
+      final client = await _clientRepository.findById(reading.clientId);
+      
+      if (client != null) {
+        selectedClient.value = client;
+        selectedReading.value = reading;
+        clientReference.value = client.reference;
+        amountToPay.value = reading.billAmount;
+        amountPaid.value = reading.billAmount;
+        
+        // Carregar contas pendentes do cliente
+        await loadPendingBillsForClient(client.id!);
+        
+        hideLoading();
+        showSuccess('Dados carregados: ${client.name} - ${reading.billAmount.toStringAsFixed(2)} MT');
+      } else {
+        hideLoading();
+        showError('Cliente não encontrado para esta leitura');
+      }
+    } catch (e) {
+      hideLoading();
+      showError('Erro ao carregar dados: $e');
+    }
+  }
+
+  // Load pre-loaded client and reading data
+  void loadPreloadedData(ClientModel client, ReadingModel reading) {
+    selectedClient.value = client;
+    selectedReading.value = reading;
+    clientReference.value = client.reference;
+    amountToPay.value = reading.billAmount;
+    amountPaid.value = reading.billAmount;
+    
+    showSuccess('Dados do cliente carregados: ${client.name}');
+    showSuccess('Valor a pagar: ${amountToPay.value.toStringAsFixed(2)} MT');
+  }
+
+  // Método público para verificar argumentos pré-carregados (pode ser chamado pela view)
+  void checkForPreloadedDataFromView() {
+    _checkForPreloadedData();
   }
 
   // Load pending bills
@@ -72,6 +147,16 @@ class PaymentController extends BaseController {
       hideLoading();
     } catch (e) {
       handleException(e);
+    }
+  }
+
+  // Load pending bills for specific client
+  Future<void> loadPendingBillsForClient(String clientId) async {
+    try {
+      final pending = await _readingRepository.findPendingBillsByClientId(clientId);
+      pendingBills.assignAll(pending);
+    } catch (e) {
+      showError('Erro ao carregar contas pendentes: $e');
     }
   }
 
@@ -205,7 +290,6 @@ class PaymentController extends BaseController {
       );
 
       // Update client total debt
-      final remainingDebt = amountToPay.value - amountPaid.value;
       final currentDebt = selectedClient.value!.totalDebt;
       final newTotalDebt = currentDebt - amountPaid.value;
 
@@ -217,29 +301,36 @@ class PaymentController extends BaseController {
       // Generate new receipt number for next payment
       await generateReceiptNumber();
 
-      clearForm();
+      // Recarregar dados ANTES de limpar formulário
       await loadPendingBills();
       await loadPaymentStats();
 
+      // Atualizar a lista de leituras se o controller existir
+      try {
+        if (Get.isRegistered<ReadingController>()) {
+          final readingController = Get.find<ReadingController>();
+          await readingController.refreshData();
+        }
+      } catch (e) {
+        print('Aviso: Não foi possível atualizar lista de leituras: $e');
+      }
+
+      hideLoading();
       showSuccess('Pagamento processado com sucesso!');
 
-      // Show receipt option
-      Get.dialog(
-        AlertDialog(
-          title: Text('Pagamento Realizado'),
-          content: Text('Deseja imprimir o recibo?'),
-          actions: [
-            TextButton(onPressed: () => Get.back(), child: Text('Não')),
-            TextButton(
-              onPressed: () {
-                Get.back();
-                printReceipt(payment);
-              },
-              child: Text('Imprimir'),
-            ),
-          ],
-        ),
-      );
+      print('🎫 DEBUG: Tentando oferecer impressão do recibo de pagamento...');
+      // Oferecer impressão do recibo - sempre chamar
+      await _offerPrintPaymentReceipt(payment).catchError((e) {
+        print('❌ Erro na oferta de impressão: $e');
+        showError('Erro ao preparar impressão: $e');
+      });
+      print('✅ DEBUG: Oferta de impressão de pagamento concluída.');
+
+      // Limpar formulário DEPOIS da impressão
+      clearForm();
+
+      // Navegar de volta
+      _navigateBackToReadings();
     } catch (e) {
       handleException(e);
     }
@@ -312,7 +403,7 @@ class PaymentController extends BaseController {
     }
 
     if (amountPaid.value > amountToPay.value) {
-      showError('Valor pago não pode ser maior que o valor da conta');
+      showError('Valor pago não pode ser maior que o valor a pagar');
       return false;
     }
 
@@ -336,7 +427,7 @@ class PaymentController extends BaseController {
     }
 
     if (amount > amountToPay.value) {
-      return 'Valor não pode ser maior que o valor da conta';
+      return 'Valor não pode ser maior que o valor a pagar';
     }
 
     return null;
@@ -349,8 +440,160 @@ class PaymentController extends BaseController {
     await loadPaymentStats();
   }
 
+  // Navigate back to readings list
+  void _navigateBackToReadings() {
+    try {
+      // Verificar se veio de uma tela específica
+      final arguments = Get.arguments;
+      if (arguments != null && arguments is Map) {
+        final returnTo = arguments['returnTo'] as String?;
+        if (returnTo != null) {
+          Get.offAllNamed(returnTo);
+          return;
+        }
+      }
+      
+      // Navegar de volta ao invés de substituir todas as rotas
+      if (Get.routing.previous.isNotEmpty) {
+        Get.back();
+      } else {
+        // Fallback: ir para readings
+        Get.offAllNamed(Routes.READINGS);
+      }
+    } catch (e) {
+      print('Erro ao navegar: $e');
+      // Fallback: voltar para home
+      Get.offAllNamed(Routes.HOME);
+    }
+  }
+
   // Get formatted amounts
   String get formattedAmountToPay =>
       '${amountToPay.value.toStringAsFixed(2)} MT';
   String get formattedAmountPaid => '${amountPaid.value.toStringAsFixed(2)} MT';
+
+  // ===== MÉTODOS DE IMPRESSÃO =====
+  
+  /// Oferece opção de imprimir recibo de pagamento
+  Future<void> _offerPrintPaymentReceipt(PaymentModel payment) async {
+    print('=== INÍCIO _offerPrintPaymentReceipt ===');
+    try {
+      // Verificar se o serviço de impressão está disponível
+      if (!Get.isRegistered<PrintService>()) {
+        print('PrintService não está registrado no pagamento!');
+        Get.snackbar('Info', 'Sistema de impressão não configurado');
+        return;
+      }
+      
+      final printService = Get.find<PrintService>();
+      print('PrintService encontrado no pagamento: ${printService.isInitialized.value}');
+      
+      if (!printService.isInitialized.value) {
+        print('PrintService não inicializado no pagamento');
+        Get.snackbar('Info', 'Serviço de impressão não está ativo');
+        return;
+      }
+      
+      // Mostrar dialog perguntando se quer imprimir
+      final shouldPrint = await Get.dialog<bool>(
+        AlertDialog(
+          title: Text('Imprimir Recibo'),
+          content: Text(
+            'Pagamento realizado com sucesso!\n\n'
+            'Cliente: ${selectedClient.value?.name ?? 'N/A'}\n'
+            'Valor: ${payment.amountPaid.toStringAsFixed(2)} MT\n'
+            'Recibo: ${payment.receiptNumber}\n\n'
+            'Deseja imprimir o recibo?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text('Não'),
+            ),
+            TextButton(
+              onPressed: () => Get.back(result: true),
+              child: Text('Imprimir'),
+            ),
+          ],
+        ),
+      );
+      
+      if (shouldPrint == true) {
+        await _printPaymentReceipt(payment);
+      }
+      
+    } catch (e) {
+      print('Erro ao oferecer impressão: $e');
+    }
+  }
+  
+  /// Imprime recibo de pagamento
+  Future<void> _printPaymentReceipt(PaymentModel payment) async {
+    try {
+      showLoading('Imprimindo recibo...');
+      
+      final printService = Get.find<PrintService>();
+      
+      final success = await printService.printPaymentReceipt(
+        clientName: selectedClient.value?.name ?? 'Cliente',
+        reference: selectedClient.value?.reference ?? 'N/A',
+        amountPaid: payment.amountPaid,
+        paymentMethod: payment.paymentMethod.displayName,
+        receiptNumber: payment.receiptNumber,
+        paymentDate: payment.paymentDate,
+      );
+      
+      hideLoading();
+      
+      if (success) {
+        showSuccess('Recibo impresso com sucesso!');
+      } else {
+        showError('Erro na impressão: ${printService.lastError.value}');
+        // Oferecer tentar novamente
+        _offerRetryPrintPayment(payment);
+      }
+      
+    } catch (e) {
+      hideLoading();
+      showError('Erro ao imprimir recibo: $e');
+    }
+  }
+  
+  /// Oferece tentar imprimir novamente
+  void _offerRetryPrintPayment(PaymentModel payment) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Falha na Impressão'),
+        content: Text(
+          'Não foi possível imprimir o recibo.\n\n'
+          'Verifique se a impressora está ligada e conectada.\n\n'
+          'Deseja tentar novamente?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              _printPaymentReceipt(payment);
+            },
+            child: Text('Tentar Novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Método público para imprimir recibo de pagamento existente
+  Future<void> printPaymentReceipt(PaymentModel payment) async {
+    await _printPaymentReceipt(payment);
+  }
+
+  /// Método legado para compatibilidade (pode ser removido depois)
+  @Deprecated('Use printPaymentReceipt instead')
+  Future<void> printReceiptLegacy(PaymentModel payment) async {
+    await printPaymentReceipt(payment);
+  }
 }

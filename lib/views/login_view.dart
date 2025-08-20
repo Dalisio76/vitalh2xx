@@ -18,34 +18,37 @@ class LoginView extends GetView<AuthController> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo and Title
-                  _buildHeader(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 500),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo and Title
+                    _buildHeader(),
 
-                  const SizedBox(height: 50),
+                    const SizedBox(height: 20),
 
-                  // Login Form
-                  _buildLoginForm(),
+                    // Login Form
+                    _buildLoginForm(),
 
-                  const SizedBox(height: 30),
+                    const SizedBox(height: 10),
 
-                  // Login Button
-                  _buildLoginButton(formKey),
+                    // Login Button
+                    _buildLoginButton(formKey),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 10),
 
-                  // Remember Me
-                  _buildRememberMe(),
+                    // Remember Me
+                    _buildRememberMe(),
 
-                  const SizedBox(height: 40),
+                    const SizedBox(height: 10),
 
-                  // Default credentials info
-                  _buildDefaultCredentials(),
-                ],
+                    // Default credentials info
+                    _buildDefaultCredentials(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -67,7 +70,7 @@ class LoginView extends GetView<AuthController> {
           child: const Icon(Icons.water_drop, size: 40, color: Colors.white),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 5),
 
         Text(
           'Bem-vindo',
@@ -152,7 +155,7 @@ class LoginView extends GetView<AuthController> {
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
         // Password Field
         Column(

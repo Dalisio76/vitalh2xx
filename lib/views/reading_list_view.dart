@@ -1,32 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/controlers/reading_controller.dart';
+import 'package:vitalh2x/controlers/auth_controller.dart';
 import 'package:vitalh2x/models/leitura_model.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/metodo_pagamento_model.dart';
 import 'package:vitalh2x/routs/rout.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
-class ReadingListView extends GetView<ReadingController> {
-  const ReadingListView({Key? key}) : super(key: key);
+class ReadingListView extends StatefulWidget {
+  ReadingListView({Key? key}) : super(key: key);
+
+  @override
+  State<ReadingListView> createState() => _ReadingListViewState();
+}
+
+class _ReadingListViewState extends State<ReadingListView> {
+  final ReadingController controller = Get.find<ReadingController>();
+  final Set<String> selectedReadings = <String>{};
+  bool selectAll = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lista de Leituras'),
-        backgroundColor: Colors.blue[600],
+        backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
+        toolbarHeight: 48,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(Icons.home),
+            onPressed: () => Get.toNamed(Routes.DASHBOARD),
+          ),
+          IconButton(
+            icon: const Icon(Icons.search, size: 20),
             onPressed: () => _showSearchDialog(),
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list, size: 20),
             onPressed: () => _showFilterOptions(),
           ),
           IconButton(
-            icon: const Icon(Icons.calendar_month),
+            icon: const Icon(Icons.calendar_month, size: 20),
             onPressed: () => _selectMonth(),
           ),
         ],
@@ -35,6 +51,7 @@ class ReadingListView extends GetView<ReadingController> {
         children: [
           _buildPeriodHeader(),
           _buildStatsBar(),
+          _buildBulkActions(),
           _buildQuickFilters(),
           Expanded(child: _buildReadingsList()),
         ],
@@ -70,6 +87,82 @@ class ReadingListView extends GetView<ReadingController> {
             style: IconButton.styleFrom(backgroundColor: Colors.blue[100]),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBulkActions() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Checkbox(
+                    value: selectAll,
+                    onChanged: (value) {
+                      setState(() {
+                        selectAll = value ?? false;
+                        if (selectAll) {
+                          selectedReadings.addAll(
+                            controller.monthlyReadings
+                                .map((r) => r.id!)
+                                .where((id) => id != null)
+                                .cast<String>(),
+                          );
+                        } else {
+                          selectedReadings.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const Text('Selecionar Todas'),
+                  const Spacer(),
+                  Text('${selectedReadings.length} selecionadas'),
+                ],
+              ),
+              if (selectedReadings.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _printSelected,
+                        icon: const Icon(Icons.print, color: Colors.white),
+                        label: const Text(
+                          'Imprimir Leituras',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _exportSelected,
+                        icon: const Icon(Icons.download, color: Colors.white),
+                        label: const Text(
+                          'Exportar Leituras',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -201,16 +294,305 @@ class ReadingListView extends GetView<ReadingController> {
 
       return RefreshIndicator(
         onRefresh: () => controller.refreshData(),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: readings.length,
-          itemBuilder: (context, index) {
-            final reading = readings[index];
-            return _buildReadingCard(reading, index);
-          },
-        ),
+        child: _buildReadingsDataGrid(readings),
       );
     });
+  }
+
+  Widget _buildReadingsDataGrid(List<ReadingModel> readings) {
+    return Container(
+      margin: const EdgeInsets.all(AppStyles.paddingSmall),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Column(
+        children: [
+          // Header Row
+          Container(
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border(bottom: BorderSide(color: Colors.grey[400]!)),
+            ),
+            child: Row(
+              children: [
+                _buildReadingHeaderCell('☑', 40),
+                Expanded(
+                  flex: 3,
+                  child: _buildReadingHeaderCellExpanded('CLIENTE'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildReadingHeaderCellExpanded('LEITURA ANT.'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildReadingHeaderCellExpanded('LEITURA ATUAL'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildReadingHeaderCellExpanded('CONSUMO'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildReadingHeaderCellExpanded('VALOR'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildReadingHeaderCellExpanded('STATUS'),
+                ),
+              ],
+            ),
+          ),
+          // Data Rows
+          Expanded(
+            child: ListView.builder(
+              itemCount: readings.length,
+              itemBuilder: (context, index) {
+                final reading = readings[index];
+                final isSelected = selectedReadings.contains(reading.id!);
+                return _buildReadingDataRow(reading, index, isSelected);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadingHeaderCell(String text, double width) {
+    return Container(
+      width: width,
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[300]!, width: 0.5)),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingHeaderCellExpanded(String text) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[300]!, width: 0.5)),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingDataRow(
+    ReadingModel reading,
+    int index,
+    bool isSelected,
+  ) {
+    return InkWell(
+      onTap: () => _selectReadingForProcessing(reading),
+      child: Container(
+        height: 20,
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? AppStyles.primaryColor.withOpacity(0.1)
+                  : (index % 2 == 0 ? Colors.white : Colors.grey[50]),
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!, width: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            _buildReadingDataCell(
+              Checkbox(
+                value: isSelected,
+                onChanged: (value) {
+                  setState(() {
+                    if (value == true) {
+                      selectedReadings.add(reading.id!);
+                    } else {
+                      selectedReadings.remove(reading.id!);
+                      selectAll = false;
+                    }
+                  });
+                },
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              40,
+            ),
+            Expanded(
+              flex: 3,
+              child: _buildReadingDataCellExpanded(
+                FutureBuilder<String>(
+                  future: controller.getClientName(reading.clientId),
+                  builder: (context, snapshot) {
+                    return Text(
+                      snapshot.data ?? 'Carregando...',
+                      style: const TextStyle(fontSize: 9),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildReadingDataCellExpanded(
+                Text(
+                  '${reading.previousReading.toStringAsFixed(1)}m³',
+                  style: const TextStyle(fontSize: 9),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildReadingDataCellExpanded(
+                Text(
+                  '${reading.currentReading.toStringAsFixed(1)}m³',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildReadingDataCellExpanded(
+                Text(
+                  '${reading.consumption.toStringAsFixed(1)}m³',
+                  style: const TextStyle(fontSize: 9, color: Colors.blue),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildReadingDataCellExpanded(
+                Text(
+                  '${reading.billAmount.toStringAsFixed(2)} MT',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildReadingDataCellExpanded(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(reading.paymentStatus),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Text(
+                    _getStatusText(reading.paymentStatus),
+                    style: const TextStyle(
+                      fontSize: 7,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingDataCell(Widget child, double width) {
+    return Container(
+      width: width,
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[200]!, width: 0.5)),
+      ),
+      child: Align(alignment: Alignment.centerLeft, child: child),
+    );
+  }
+
+  Widget _buildReadingDataCellExpanded(Widget child) {
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[200]!, width: 0.5)),
+      ),
+      child: Align(alignment: Alignment.centerLeft, child: child),
+    );
+  }
+
+  Color _getStatusColor(PaymentStatus status) {
+    switch (status) {
+      case PaymentStatus.pending:
+        return Colors.orange;
+      case PaymentStatus.overdue:
+        return Colors.red;
+      case PaymentStatus.paid:
+        return Colors.green;
+      case PaymentStatus.partial:
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(PaymentStatus status) {
+    switch (status) {
+      case PaymentStatus.pending:
+        return 'PENDENTE';
+      case PaymentStatus.overdue:
+        return 'DÍVIDA';
+      case PaymentStatus.paid:
+        return 'PAGO';
+      case PaymentStatus.partial:
+        return 'PARCIAL';
+      default:
+        return 'N/A';
+    }
+  }
+
+  void _selectReadingForProcessing(ReadingModel reading) {
+    // Navegar para processamento de pagamento com dados pré-carregados
+    Get.toNamed(
+      Routes.PAYMENT_FORM,
+      arguments: {
+        'preloaded': true,
+        'reading': reading,
+        'client': null, // Será carregado no controller
+      },
+    );
   }
 
   Widget _buildEmptyState() {
@@ -244,13 +626,13 @@ class ReadingListView extends GetView<ReadingController> {
   }
 
   Widget _buildReadingCard(ReadingModel reading, int index) {
-    final isOverdue = reading.paymentStatus == PaymentStatus.overdue;
-    final isPaid = reading.paymentStatus == PaymentStatus.paid;
+    final readingId = reading.id!;
+    final isSelected = selectedReadings.contains(readingId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: isOverdue ? 4 : 1,
-      color: isOverdue ? Colors.red[50] : null,
+      elevation: 1,
+      color: isSelected ? Colors.blue[50] : null,
       child: InkWell(
         onTap: () => _showReadingActions(reading),
         borderRadius: BorderRadius.circular(8),
@@ -261,17 +643,24 @@ class ReadingListView extends GetView<ReadingController> {
             children: [
               Row(
                 children: [
+                  // Checkbox
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedReadings.add(readingId);
+                        } else {
+                          selectedReadings.remove(readingId);
+                        }
+                      });
+                    },
+                  ),
                   Hero(
                     tag: 'reading_$index',
                     child: CircleAvatar(
-                      backgroundColor: _getStatusColor(
-                        reading.paymentStatus,
-                      ).withOpacity(0.1),
-                      child: Icon(
-                        _getStatusIcon(reading.paymentStatus),
-                        color: _getStatusColor(reading.paymentStatus),
-                        size: 20,
-                      ),
+                      backgroundColor: Colors.blue.withOpacity(0.1),
+                      child: Icon(Icons.speed, color: Colors.blue, size: 20),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -283,37 +672,12 @@ class ReadingListView extends GetView<ReadingController> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    clientName,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (isOverdue)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red[600],
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'ATRASO',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            Text(
+                              clientName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               'Período: ${reading.month}/${reading.year}',
@@ -331,11 +695,11 @@ class ReadingListView extends GetView<ReadingController> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${reading.billAmount.toStringAsFixed(2)} MT',
-                        style: TextStyle(
+                        '${reading.consumption.toStringAsFixed(1)} m³',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: _getStatusColor(reading.paymentStatus),
+                          color: Colors.blue,
                         ),
                       ),
                       Container(
@@ -344,15 +708,13 @@ class ReadingListView extends GetView<ReadingController> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(
-                            reading.paymentStatus,
-                          ).withOpacity(0.1),
+                          color: Colors.blue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
-                          _getStatusText(reading.paymentStatus),
+                        child: const Text(
+                          'LEITURA',
                           style: TextStyle(
-                            color: _getStatusColor(reading.paymentStatus),
+                            color: Colors.blue,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -516,6 +878,23 @@ class ReadingListView extends GetView<ReadingController> {
                 onTap: () {
                   Get.back();
                   _viewClient(reading.clientId);
+                },
+              ),
+              // Delete option (admin only)
+              FutureBuilder<bool>(
+                future: _checkIfAdmin(),
+                builder: (context, snapshot) {
+                  if (snapshot.data == true) {
+                    return ListTile(
+                      leading: const Icon(Icons.delete, color: Colors.red),
+                      title: const Text('Apagar Leitura'),
+                      onTap: () {
+                        Get.back();
+                        controller.deleteReading(reading);
+                      },
+                    );
+                  }
+                  return const SizedBox.shrink();
                 },
               ),
             ],
@@ -911,9 +1290,38 @@ class ReadingListView extends GetView<ReadingController> {
   }
 
   // Action methods
-  void _processPayment(ReadingModel reading) {
-    // Navigate to payment form with pre-selected reading
-    Get.toNamed(Routes.PAYMENT_FORM, arguments: reading);
+  void _processPayment(ReadingModel reading) async {
+    // Carregar dados do cliente e navegar para formação de pagamento
+    try {
+      final client = await controller.getClientById(reading.clientId);
+
+      if (client != null) {
+        final arguments = {
+          'reading': reading,
+          'client': client,
+          'preloaded': true,
+        };
+
+        // Navegar para o formulário de pagamento com dados pré-carregados
+        Get.toNamed(Routes.PAYMENT_FORM, arguments: arguments);
+      } else {
+        Get.snackbar(
+          'Erro',
+          'Cliente não encontrado',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Erro',
+        'Erro ao carregar dados do cliente: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 
   void _printBill(ReadingModel reading) {
@@ -925,20 +1333,18 @@ class ReadingListView extends GetView<ReadingController> {
     Get.toNamed(Routes.CLIENT_DETAIL, arguments: clientId);
   }
 
-  // Helper methods
-  Color _getStatusColor(PaymentStatus status) {
-    switch (status) {
-      case PaymentStatus.paid:
-        return Colors.green;
-      case PaymentStatus.partial:
-        return Colors.blue;
-      case PaymentStatus.overdue:
-        return Colors.red;
-      case PaymentStatus.pending:
-      default:
-        return Colors.orange;
+  Future<bool> _checkIfAdmin() async {
+    try {
+      // Import AuthController if not already imported
+      final authController = Get.find<AuthController>();
+      return authController.isAdmin();
+    } catch (e) {
+      // If AuthController not found, assume not admin
+      return false;
     }
   }
+
+  // Helper methods
 
   IconData _getStatusIcon(PaymentStatus status) {
     switch (status) {
@@ -949,29 +1355,12 @@ class ReadingListView extends GetView<ReadingController> {
       case PaymentStatus.overdue:
         return Icons.warning;
       case PaymentStatus.pending:
-      default:
         return Icons.pending;
     }
   }
 
-  String _getStatusText(PaymentStatus status) {
-    switch (status) {
-      case PaymentStatus.paid:
-        return 'PAGO';
-      case PaymentStatus.partial:
-        return 'PARCIAL';
-      case PaymentStatus.overdue:
-        return 'ATRASADO';
-      case PaymentStatus.pending:
-      default:
-        return 'PENDENTE';
-    }
-  }
-
   Future<String> _getClientName(String clientId) async {
-    // TODO: Implement client name lookup
-    // This should use a client repository or controller to get client name
-    return 'Cliente $clientId';
+    return await controller.getClientName(clientId);
   }
 
   String _formatDate(DateTime date) {
@@ -1000,9 +1389,29 @@ class ReadingListView extends GetView<ReadingController> {
     return months[month - 1];
   }
 
-  @override
+  void _printSelected() {
+    // TODO: Implementar impressão das leituras selecionadas
+    Get.snackbar(
+      'Impressão',
+      '${selectedReadings.length} leituras selecionadas para impressão',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.purple,
+      colorText: Colors.white,
+    );
+  }
+
+  void _exportSelected() {
+    // TODO: Implementar exportação das leituras selecionadas
+    Get.snackbar(
+      'Exportação',
+      '${selectedReadings.length} leituras selecionadas para exportação',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+    );
+  }
+
   void onInit() {
-    // super.onInit();
     // Load data when view initializes
     controller.loadMonthlyReadings();
     controller.loadMonthlyStats();

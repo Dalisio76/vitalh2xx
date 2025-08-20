@@ -10,8 +10,8 @@ import 'package:vitalh2x/controlers/reading_controller.dart';
 class PaymentBinding extends Bindings {
   @override
   void dependencies() {
-    // Payment Controller
-    Get.lazyPut<PaymentController>(() => PaymentController(), fenix: true);
+    // Payment Controller - usar put para garantir que seja criado imediatamente
+    Get.put<PaymentController>(PaymentController());
 
     // Reading Controller (needed for pending bills)
     Get.lazyPut<ReadingController>(() => ReadingController(), fenix: true);

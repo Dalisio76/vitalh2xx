@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:vitalh2x/controlers/client_controller.dart';
-import 'package:vitalh2x/models/cliente_model.dart';
+import 'package:vitalh2x/controlers/user_controller.dart';
+import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/routs/rout.dart';
 import 'package:vitalh2x/utils/app_styles.dart';
 
-class ClientListView extends StatefulWidget {
-  const ClientListView({Key? key}) : super(key: key);
+class UserListView extends StatefulWidget {
+  const UserListView({Key? key}) : super(key: key);
 
   @override
-  State<ClientListView> createState() => _ClientListViewState();
+  State<UserListView> createState() => _UserListViewState();
 }
 
-class _ClientListViewState extends State<ClientListView> {
-  final ClientController controller = Get.find<ClientController>();
-  final Set<String> selectedClients = <String>{};
+class _UserListViewState extends State<UserListView> {
+  final UserController controller = Get.put(UserController());
+  final Set<String> selectedUsers = <String>{};
   bool selectAll = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lista de Clientes'),
+        title: const Text('Usuários'),
         backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
         toolbarHeight: 48,
@@ -46,11 +46,11 @@ class _ClientListViewState extends State<ClientListView> {
           _buildStatsBar(),
           _buildBulkActions(),
           _buildQuickFilters(),
-          Expanded(child: _buildClientsList()),
+          Expanded(child: _buildUsersList()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Get.toNamed(Routes.CLIENT_FORM),
+        onPressed: () => Get.toNamed(Routes.USER_FORM),
         backgroundColor: AppStyles.primaryColor,
         child: const Icon(Icons.person_add),
       ),
@@ -62,7 +62,7 @@ class _ClientListViewState extends State<ClientListView> {
       padding: const EdgeInsets.all(AppStyles.paddingLarge),
       child: TextField(
         decoration: AppStyles.compactInputDecoration(
-          hintText: 'Buscar por nome, referência ou contacto...',
+          hintText: 'Buscar por nome, email ou telefone...',
           prefixIcon: Icons.search,
           suffixIcon: Obx(() {
             if (controller.searchTerm.value.isNotEmpty) {
@@ -93,10 +93,10 @@ class _ClientListViewState extends State<ClientListView> {
         ),
       ),
       child: Obx(() {
-        final stats = controller.stats.value;
+        final stats = controller.stats;
         final total = stats['total'] ?? 0;
         final active = stats['active'] ?? 0;
-        final withDebt = stats['with_debt'] ?? 0;
+        final admins = stats['admins'] ?? 0;
 
         return Row(
           children: [
@@ -128,10 +128,10 @@ class _ClientListViewState extends State<ClientListView> {
             ),
             Expanded(
               child: _buildStatItem(
-                'Com Dívida',
-                '$withDebt',
-                Icons.warning,
-                AppStyles.errorColor,
+                'Admins',
+                '$admins',
+                Icons.admin_panel_settings,
+                Colors.orange,
               ),
             ),
           ],
@@ -183,24 +183,23 @@ class _ClientListViewState extends State<ClientListView> {
                       setState(() {
                         selectAll = value ?? false;
                         if (selectAll) {
-                          selectedClients.addAll(
-                            controller.filteredClients
-                                .map((c) => c.id!)
-                                .where((id) => id != null)
-                                .cast<String>(),
+                          selectedUsers.addAll(
+                            controller.filteredUsers
+                                .map((u) => u.id!)
+                                .where((id) => id.isNotEmpty),
                           );
                         } else {
-                          selectedClients.clear();
+                          selectedUsers.clear();
                         }
                       });
                     },
                   ),
                   const Text('Selecionar Todos'),
                   const Spacer(),
-                  Text('${selectedClients.length} selecionados'),
+                  Text('${selectedUsers.length} selecionados'),
                 ],
               ),
-              if (selectedClients.isNotEmpty) ...[
+              if (selectedUsers.isNotEmpty) ...[ 
                 const SizedBox(height: AppStyles.paddingLarge),
                 Row(
                   children: [
@@ -249,7 +248,11 @@ class _ClientListViewState extends State<ClientListView> {
             const SizedBox(width: AppStyles.paddingMedium),
             _buildFilterChip('Ativos', () => _filterActive()),
             const SizedBox(width: AppStyles.paddingMedium),
-            _buildFilterChip('Com Dívida', () => _filterWithDebt()),
+            _buildFilterChip('Admins', () => _filterAdmins()),
+            const SizedBox(width: AppStyles.paddingMedium),
+            _buildFilterChip('Caixa', () => _filterCashiers()),
+            const SizedBox(width: AppStyles.paddingMedium),
+            _buildFilterChip('Campo', () => _filterFieldOperators()),
             const SizedBox(width: AppStyles.paddingMedium),
             _buildFilterChip('Limpar', () => _clearFilters(), isReset: true),
           ],
@@ -278,25 +281,25 @@ class _ClientListViewState extends State<ClientListView> {
     );
   }
 
-  Widget _buildClientsList() {
+  Widget _buildUsersList() {
     return Obx(() {
       if (controller.isLoading) {
         return const Center(child: CircularProgressIndicator());
       }
 
-      final clients = controller.filteredClients.value;
-      if (clients.isEmpty) {
+      final users = controller.filteredUsers;
+      if (users.isEmpty) {
         return _buildEmptyState();
       }
 
       return RefreshIndicator(
         onRefresh: () => controller.refreshData(),
-        child: _buildDataGrid(clients),
+        child: _buildDataGrid(users),
       );
     });
   }
 
-  Widget _buildDataGrid(List<ClientModel> clients) {
+  Widget _buildDataGrid(List<UserModel> users) {
     return Container(
       margin: const EdgeInsets.all(AppStyles.paddingSmall),
       decoration: BoxDecoration(
@@ -316,9 +319,9 @@ class _ClientListViewState extends State<ClientListView> {
               children: [
                 _buildHeaderCell('☑', 40),
                 Expanded(flex: 3, child: _buildHeaderCellExpanded('NOME')),
-                Expanded(flex: 2, child: _buildHeaderCellExpanded('REF')),
-                Expanded(flex: 2, child: _buildHeaderCellExpanded('CONTACTO')),
-                Expanded(flex: 2, child: _buildHeaderCellExpanded('DÍVIDA')),
+                Expanded(flex: 3, child: _buildHeaderCellExpanded('EMAIL')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('TELEFONE')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('PERFIL')),
                 Expanded(flex: 1, child: _buildHeaderCellExpanded('STATUS')),
               ],
             ),
@@ -326,11 +329,11 @@ class _ClientListViewState extends State<ClientListView> {
           // Data Rows
           Expanded(
             child: ListView.builder(
-              itemCount: clients.length,
+              itemCount: users.length,
               itemBuilder: (context, index) {
-                final client = clients[index];
-                final isSelected = selectedClients.contains(client.id!);
-                return _buildDataRow(client, index, isSelected);
+                final user = users[index];
+                final isSelected = selectedUsers.contains(user.id!);
+                return _buildDataRow(user, index, isSelected);
               },
             ),
           ),
@@ -384,11 +387,9 @@ class _ClientListViewState extends State<ClientListView> {
     );
   }
 
-  Widget _buildDataRow(ClientModel client, int index, bool isSelected) {
-    final hasDebt = client.totalDebt > 0;
-
+  Widget _buildDataRow(UserModel user, int index, bool isSelected) {
     return InkWell(
-      onTap: () => Get.toNamed(Routes.CLIENT_DETAIL, arguments: client),
+      onTap: () => Get.toNamed(Routes.USER_DETAIL, arguments: user),
       child: Container(
         height: 20,
         decoration: BoxDecoration(
@@ -408,9 +409,9 @@ class _ClientListViewState extends State<ClientListView> {
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      selectedClients.add(client.id!);
+                      selectedUsers.add(user.id!);
                     } else {
-                      selectedClients.remove(client.id!);
+                      selectedUsers.remove(user.id!);
                       selectAll = false;
                     }
                   });
@@ -423,20 +424,20 @@ class _ClientListViewState extends State<ClientListView> {
             Expanded(
               flex: 3,
               child: _buildDataCellExpanded(
-                Text(client.name, style: const TextStyle(fontSize: 9)),
+                Text(user.name, style: const TextStyle(fontSize: 9)),
               ),
             ),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: _buildDataCellExpanded(
-                Text(client.reference, style: const TextStyle(fontSize: 9)),
+                Text(user.email, style: const TextStyle(fontSize: 9)),
               ),
             ),
             Expanded(
               flex: 2,
               child: _buildDataCellExpanded(
                 Text(
-                  client.contact.isNotEmpty ? client.contact : 'N/A',
+                  user.phone ?? 'N/A',
                   style: const TextStyle(fontSize: 9),
                 ),
               ),
@@ -444,14 +445,22 @@ class _ClientListViewState extends State<ClientListView> {
             Expanded(
               flex: 2,
               child: _buildDataCellExpanded(
-                Text(
-                  hasDebt
-                      ? '${client.totalDebt.toStringAsFixed(2)} MT'
-                      : '0.00',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: hasDebt ? Colors.red : Colors.green,
-                    fontWeight: hasDebt ? FontWeight.bold : FontWeight.normal,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getRoleColor(user.role),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Text(
+                    _getRoleShortName(user.role),
+                    style: const TextStyle(
+                      fontSize: 7,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -465,11 +474,11 @@ class _ClientListViewState extends State<ClientListView> {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: client.isActive ? Colors.green : Colors.red,
+                    color: user.isActive ? Colors.green : Colors.red,
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Text(
-                    client.isActive ? 'ATIVO' : 'INATIVO',
+                    user.isActive ? 'ATIVO' : 'INATIVO',
                     style: const TextStyle(
                       fontSize: 7,
                       color: Colors.white,
@@ -508,162 +517,6 @@ class _ClientListViewState extends State<ClientListView> {
     );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      height: 28,
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          // Checkbox e Avatar
-          SizedBox(
-            width: 50,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AppStyles.compactCheckbox(
-                  value: selectAll,
-                  onChanged: (value) {
-                    setState(() {
-                      selectAll = value ?? false;
-                      if (selectAll) {
-                        selectedClients.addAll(
-                          controller.filteredClients
-                              .map((c) => c.id!)
-                              .where((id) => id != null)
-                              .cast<String>(),
-                        );
-                      } else {
-                        selectedClients.clear();
-                      }
-                    });
-                  },
-                  size: 14,
-                ),
-              ],
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Nome (flex 3)
-          Expanded(
-            flex: 3,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'NOME',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Referência (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'REF',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Contacto (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'CONTACTO',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Contador (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'CONTADOR',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Última Leitura (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'ÚLT.LEIT',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Dívida (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'DÍVIDA',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          // Status (flex 2)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: const Text(
-                'STATUS',
-                style: TextStyle(
-                  fontSize: AppStyles.fontSizeTiny,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          // Ações
-          const SizedBox(width: 40),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -676,14 +529,14 @@ class _ClientListViewState extends State<ClientListView> {
               return Column(
                 children: [
                   Text(
-                    'Nenhum cliente encontrado',
+                    'Nenhum usuário encontrado',
                     style: AppStyles.compactTitle.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: AppStyles.paddingMedium),
                   Text(
-                    'Não encontramos clientes com "${controller.searchTerm.value}"',
+                    'Não encontramos usuários com "${controller.searchTerm.value}"',
                     textAlign: TextAlign.center,
                     style: AppStyles.compactBody.copyWith(
                       color: Colors.grey[500],
@@ -700,14 +553,14 @@ class _ClientListViewState extends State<ClientListView> {
               return Column(
                 children: [
                   Text(
-                    'Nenhum cliente cadastrado',
+                    'Nenhum usuário cadastrado',
                     style: AppStyles.compactTitle.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: AppStyles.paddingMedium),
                   Text(
-                    'Comece adicionando seu primeiro cliente',
+                    'Comece adicionando o primeiro usuário',
                     textAlign: TextAlign.center,
                     style: AppStyles.compactBody.copyWith(
                       color: Colors.grey[500],
@@ -719,9 +572,9 @@ class _ClientListViewState extends State<ClientListView> {
           }),
           const SizedBox(height: AppStyles.paddingXLarge),
           ElevatedButton.icon(
-            onPressed: () => Get.toNamed('/client-form'),
+            onPressed: () => Get.toNamed(Routes.USER_FORM),
             icon: const Icon(Icons.person_add, size: 16),
-            label: const Text('Primeiro Cliente'),
+            label: const Text('Primeiro Usuário'),
             style: AppStyles.compactButtonStyle(),
           ),
         ],
@@ -729,150 +582,38 @@ class _ClientListViewState extends State<ClientListView> {
     );
   }
 
-  Widget _buildClientCard(ClientModel client, int index) {
-    final hasDebt = client.totalDebt > 0;
-    final isInactive = !client.isActive;
-    final clientId = client.id!;
-    final isSelected = selectedClients.contains(clientId);
-
-    return AppStyles.excelListTile(
-      title: client.name,
-      details: [
-        client.reference,
-        client.contact.isNotEmpty ? client.contact : 'N/A',
-        client.counterNumber,
-        client.lastReading?.toStringAsFixed(0) ?? 'N/A',
-        hasDebt ? '${client.totalDebt.toStringAsFixed(2)} MT' : '0.00 MT',
-        client.isActive ? 'Ativo' : 'Inativo',
-      ],
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppStyles.compactCheckbox(
-            value: isSelected,
-            onChanged: (value) {
-              setState(() {
-                if (value == true) {
-                  selectedClients.add(clientId);
-                } else {
-                  selectedClients.remove(clientId);
-                  selectAll = false;
-                }
-              });
-            },
-            size: 14,
-          ),
-          const SizedBox(width: 4),
-          CircleAvatar(
-            radius: 8,
-            backgroundColor: _getClientColor(client).withOpacity(0.1),
-            child: Text(
-              client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
-              style: TextStyle(
-                color: _getClientColor(client),
-                fontWeight: FontWeight.bold,
-                fontSize: 8,
-              ),
-            ),
-          ),
-        ],
-      ),
-      trailing: PopupMenuButton<String>(
-        padding: EdgeInsets.zero,
-        iconSize: 14,
-        onSelected: (value) => _handleClientAction(value, client),
-        itemBuilder:
-            (context) => [
-              const PopupMenuItem(
-                value: 'view',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.visibility, size: 14),
-                    SizedBox(width: 8),
-                    Text('Ver', style: TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'edit',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 14),
-                    SizedBox(width: 8),
-                    Text('Editar', style: TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'reading',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.speed, size: 14),
-                    SizedBox(width: 8),
-                    Text('Leitura', style: TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ),
-              if (hasDebt)
-                const PopupMenuItem(
-                  value: 'payment',
-                  height: 32,
-                  child: Row(
-                    children: [
-                      Icon(Icons.payment, size: 14),
-                      SizedBox(width: 8),
-                      Text('Pagar', style: TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                ),
-            ],
-      ),
-      onTap: () => Get.toNamed(Routes.CLIENT_DETAIL, arguments: client),
-      isSelected: isSelected,
-    );
+  Color _getRoleColor(UserRole role) {
+    switch (role) {
+      case UserRole.admin:
+        return Colors.red;
+      case UserRole.cashier:
+        return Colors.blue;
+      case UserRole.fieldOperator:
+        return Colors.green;
+    }
   }
 
-  Widget _buildClientInfo(
-    String label,
-    String value,
-    IconData icon, {
-    Color? color,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, size: 16, color: color ?? Colors.grey[600]),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        Text(
-          label,
-          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
+  String _getRoleShortName(UserRole role) {
+    switch (role) {
+      case UserRole.admin:
+        return 'ADM';
+      case UserRole.cashier:
+        return 'CAIXA';
+      case UserRole.fieldOperator:
+        return 'CAMPO';
+    }
   }
 
   void _showSearchDialog() {
     Get.dialog(
       AlertDialog(
-        title: const Text('Buscar Clientes'),
+        title: const Text('Buscar Usuários'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               decoration: const InputDecoration(
-                labelText: 'Nome do Cliente',
+                labelText: 'Nome do Usuário',
                 hintText: 'Digite o nome...',
                 prefixIcon: Icon(Icons.person_search),
               ),
@@ -881,9 +622,9 @@ class _ClientListViewState extends State<ClientListView> {
             const SizedBox(height: 16),
             TextField(
               decoration: const InputDecoration(
-                labelText: 'Referência',
-                hintText: 'Digite a referência...',
-                prefixIcon: Icon(Icons.tag),
+                labelText: 'Email',
+                hintText: 'Digite o email...',
+                prefixIcon: Icon(Icons.email),
               ),
               onChanged: (value) => controller.searchTerm.value = value,
             ),
@@ -919,17 +660,28 @@ class _ClientListViewState extends State<ClientListView> {
                 value: controller.showOnlyActive.value,
                 onChanged: (value) {
                   controller.showOnlyActive.value = value;
-                  controller.filterClients();
                 },
               ),
-              SwitchListTile(
-                title: const Text('Mostrar apenas com dívida'),
-                value: controller.showOnlyWithDebt.value,
+              const SizedBox(height: 10),
+              const Text('Filtrar por Perfil:'),
+              Obx(() => DropdownButton<UserRole?>(
+                value: controller.filterRole.value,
+                isExpanded: true,
+                hint: const Text('Selecione um perfil'),
+                items: [
+                  const DropdownMenuItem<UserRole?>(
+                    value: null,
+                    child: Text('Todos os perfis'),
+                  ),
+                  ...UserRole.values.map((role) => DropdownMenuItem(
+                    value: role,
+                    child: Text(role.displayName),
+                  )),
+                ],
                 onChanged: (value) {
-                  controller.showOnlyWithDebt.value = value;
-                  controller.filterClients();
+                  controller.filterRole.value = value;
                 },
-              ),
+              )),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -958,83 +710,36 @@ class _ClientListViewState extends State<ClientListView> {
     );
   }
 
-  void _handleClientAction(String action, ClientModel client) {
-    switch (action) {
-      case 'view':
-        Get.toNamed('/client-detail', arguments: client);
-        break;
-      case 'edit':
-        controller.selectClient(client);
-        Get.toNamed('/client-form', arguments: client);
-        break;
-      case 'reading':
-        Get.toNamed('/reading-form', arguments: client);
-        break;
-      case 'payment':
-        Get.toNamed('/payment-form', arguments: client);
-        break;
-      case 'activate':
-        // TODO: Implement activate method in controller
-        controller.showSuccess('Ativação em desenvolvimento');
-        break;
-      case 'deactivate':
-        _confirmDeactivateClient(client);
-        break;
-    }
-  }
-
-  void _confirmDeactivateClient(ClientModel client) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Desativar Cliente'),
-        content: Text(
-          'Deseja desativar o cliente ${client.name}?\n\nEle não aparecerá mais nas listas de clientes ativos.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.deactivateClient(client.id!);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Desativar'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Filter methods
   void _filterAll() {
+    controller.filterRole.value = null;
     controller.showOnlyActive.value = false;
-    controller.showOnlyWithDebt.value = false;
-    controller.filterClients();
   }
 
   void _filterActive() {
+    controller.filterRole.value = null;
     controller.showOnlyActive.value = true;
-    controller.showOnlyWithDebt.value = false;
-    controller.filterClients();
   }
 
-  void _filterWithDebt() {
-    controller.showOnlyActive.value = false;
-    controller.showOnlyWithDebt.value = true;
-    controller.filterClients();
+  void _filterAdmins() {
+    controller.filterRole.value = UserRole.admin;
+    controller.showOnlyActive.value = true;
+  }
+
+  void _filterCashiers() {
+    controller.filterRole.value = UserRole.cashier;
+    controller.showOnlyActive.value = true;
+  }
+
+  void _filterFieldOperators() {
+    controller.filterRole.value = UserRole.fieldOperator;
+    controller.showOnlyActive.value = true;
   }
 
   void _clearFilters() {
+    controller.filterRole.value = null;
     controller.showOnlyActive.value = true;
-    controller.showOnlyWithDebt.value = false;
     controller.searchTerm.value = '';
-    controller.filterClients();
   }
 
   void _clearSearch() {
@@ -1043,13 +748,13 @@ class _ClientListViewState extends State<ClientListView> {
 
   // Bulk action methods
   void _deactivateSelected() {
-    if (selectedClients.isEmpty) return;
+    if (selectedUsers.isEmpty) return;
 
     Get.dialog(
       AlertDialog(
-        title: const Text('Desativar Clientes'),
+        title: const Text('Desativar Usuários'),
         content: Text(
-          'Deseja desativar ${selectedClients.length} clientes selecionados?\n\nEles não aparecerão mais nas listas de clientes ativos.',
+          'Deseja desativar ${selectedUsers.length} usuários selecionados?',
         ),
         actions: [
           TextButton(
@@ -1074,16 +779,16 @@ class _ClientListViewState extends State<ClientListView> {
 
   void _confirmDeactivateSelected() async {
     try {
-      for (String clientId in selectedClients) {
-        await controller.deactivateClient(clientId);
+      for (String userId in selectedUsers) {
+        await controller.deactivateUser(userId);
       }
       setState(() {
-        selectedClients.clear();
+        selectedUsers.clear();
         selectAll = false;
       });
       Get.snackbar(
         'Sucesso',
-        'Clientes desativados com sucesso',
+        'Usuários desativados com sucesso',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white,
@@ -1091,7 +796,7 @@ class _ClientListViewState extends State<ClientListView> {
     } catch (e) {
       Get.snackbar(
         'Erro',
-        'Erro ao desativar clientes: $e',
+        'Erro ao desativar usuários: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -1100,22 +805,14 @@ class _ClientListViewState extends State<ClientListView> {
   }
 
   void _exportSelected() {
-    if (selectedClients.isEmpty) return;
+    if (selectedUsers.isEmpty) return;
 
-    // TODO: Implementar exportação real dos clientes selecionados
     Get.snackbar(
       'Exportação',
-      '${selectedClients.length} clientes selecionados para exportação',
+      '${selectedUsers.length} usuários selecionados para exportação',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.blue,
       colorText: Colors.white,
     );
-  }
-
-  // Helper methods
-  Color _getClientColor(ClientModel client) {
-    if (!client.isActive) return Colors.grey;
-    if (client.totalDebt > 0) return Colors.red;
-    return Colors.green;
   }
 }

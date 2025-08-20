@@ -4,7 +4,14 @@
       "Bash(flutter pub:*)",
       "Bash(flutter analyze:*)",
       "Bash(flutter build:*)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(rm:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter test:*)",
+      "WebSearch",
+      "WebFetch(domain:pub.dev)",
+      "Bash(dart:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

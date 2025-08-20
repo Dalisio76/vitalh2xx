@@ -1,8 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/services/app_config.dart';
 
@@ -79,10 +80,11 @@ class DatabaseService {
         )
       ''');
 
-      // Tabela de Leituras - VERSÃO ATUALIZADA COM TIMESTAMPS
+      // Tabela de Leituras - VERSÃO ATUALIZADA COM TIMESTAMPS E NUMERAÇÃO
       await db.execute('''
         CREATE TABLE readings (
           id TEXT PRIMARY KEY,
+          reading_number INTEGER,
           client_id TEXT NOT NULL,
           month INTEGER NOT NULL,
           year INTEGER NOT NULL,
@@ -106,6 +108,7 @@ class DatabaseService {
       await db.execute('''
         CREATE TABLE payments (
           id TEXT PRIMARY KEY,
+          payment_number INTEGER UNIQUE,
           client_id TEXT NOT NULL,
           reading_id TEXT NOT NULL,
           amount_paid REAL NOT NULL,
@@ -116,6 +119,8 @@ class DatabaseService {
           notes TEXT,
           user_id TEXT NOT NULL,
           is_synced INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
           FOREIGN KEY (reading_id) REFERENCES readings (id) ON DELETE CASCADE,
           FOREIGN KEY (user_id) REFERENCES users (id)
@@ -203,10 +208,11 @@ class DatabaseService {
     }
   }
 
-  // Hash simples da senha (em produção usar crypto melhor)
+  // Hash da senha usando SHA256
   String _hashPassword(String password) {
-    // Por simplicidade, usando base64. Em produção usar bcrypt ou similar
-    return password; // TODO: Implementar hash real
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   // Upgrade da base de dados
@@ -222,6 +228,21 @@ class DatabaseService {
       if (oldVersion < 3) {
         print('🔄 Executando migração para versão 3...');
         await _migrateToVersion3(db);
+      }
+
+      if (oldVersion < 4) {
+        print('🔄 Executando migração para versão 4...');
+        await _migrateToVersion4(db);
+      }
+
+      if (oldVersion < 5) {
+        print('🔄 Executando migração para versão 5...');
+        await _migrateToVersion5(db);
+      }
+
+      if (oldVersion < 6) {
+        print('🔄 Executando migração para versão 6...');
+        await _migrateToVersion6(db);
       }
 
       // Adicione outras migrações conforme necessário
@@ -313,6 +334,243 @@ class DatabaseService {
     // Exemplo: adicionar novas colunas, tabelas, etc.
     // await db.execute('ALTER TABLE clients ADD COLUMN new_field TEXT');
     print('✅ Migração para versão 3 executada (exemplo)');
+  }
+
+  // Migração para versão 4 - Adicionar payment_number à tabela payments
+  Future<void> _migrateToVersion4(Database db) async {
+    await db.transaction((txn) async {
+      try {
+        print('🔄 Verificando estrutura da tabela payments...');
+        
+        // Verificar se a coluna payment_number já existe na tabela payments
+        final paymentsInfo = await txn.rawQuery("PRAGMA table_info(payments)");
+        final hasPaymentNumber = paymentsInfo.any(
+          (col) => col['name'] == 'payment_number',
+        );
+
+        if (!hasPaymentNumber) {
+          print('📝 Adicionando coluna payment_number...');
+          
+          // Método mais seguro: recriar a tabela com a nova estrutura
+          await _recreatePaymentsTableWithPaymentNumber(txn);
+          
+        } else {
+          print('ℹ️  Coluna payment_number já existe na tabela payments');
+          
+          // Verificar se o índice único existe, se não, criar
+          try {
+            await txn.execute(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_number_unique ON payments(payment_number)',
+            );
+            print('✅ Índice único verificado/criado para payment_number');
+          } catch (e) {
+            print('ℹ️  Índice único já existe: $e');
+          }
+        }
+      } catch (e) {
+        print('❌ Erro ao migrar tabela payments: $e');
+        // Em caso de erro, tenta método alternativo mais simples
+        try {
+          print('🔄 Tentando método alternativo...');
+          await txn.execute('ALTER TABLE payments ADD COLUMN payment_number INTEGER DEFAULT NULL');
+          print('✅ Coluna payment_number adicionada (método alternativo)');
+        } catch (altError) {
+          print('❌ Método alternativo também falhou: $altError');
+          // Se falhar completamente, continua sem a coluna payment_number
+          // O app ainda funcionará, mas sem numeração sequencial
+        }
+      }
+    });
+    print('✅ Migração para versão 4 concluída');
+  }
+
+  // Método auxiliar para recriar a tabela payments com payment_number
+  Future<void> _recreatePaymentsTableWithPaymentNumber(Transaction txn) async {
+    // 1. Criar tabela temporária com nova estrutura
+    await txn.execute('''
+      CREATE TABLE payments_temp (
+        id TEXT PRIMARY KEY,
+        payment_number INTEGER UNIQUE,
+        client_id TEXT NOT NULL,
+        reading_id TEXT NOT NULL,
+        amount_paid REAL NOT NULL,
+        payment_method INTEGER NOT NULL DEFAULT 0,
+        payment_date TEXT NOT NULL,
+        receipt_number TEXT UNIQUE NOT NULL,
+        transaction_reference TEXT,
+        notes TEXT,
+        user_id TEXT NOT NULL,
+        is_synced INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+        FOREIGN KEY (reading_id) REFERENCES readings (id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    ''');
+    print('✅ Tabela temporária payments_temp criada');
+
+    // 2. Copiar dados existentes (se houver)
+    final existingPayments = await txn.rawQuery('SELECT COUNT(*) as count FROM payments');
+    final count = existingPayments.first['count'] as int;
+    
+    if (count > 0) {
+      await txn.execute('''
+        INSERT INTO payments_temp (
+          id, client_id, reading_id, amount_paid, payment_method, 
+          payment_date, receipt_number, transaction_reference, 
+          notes, user_id, is_synced, created_at, updated_at
+        )
+        SELECT 
+          id, client_id, reading_id, amount_paid, payment_method, 
+          payment_date, receipt_number, transaction_reference, 
+          notes, user_id, is_synced, created_at, updated_at
+        FROM payments
+      ''');
+      print('✅ $count pagamentos copiados para tabela temporária');
+    }
+
+    // 3. Remover tabela antiga
+    await txn.execute('DROP TABLE payments');
+    print('✅ Tabela payments antiga removida');
+
+    // 4. Renomear tabela temporária
+    await txn.execute('ALTER TABLE payments_temp RENAME TO payments');
+    print('✅ Tabela temporária renomeada para payments');
+
+    // 5. Recriar índices
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_payments_client ON payments(client_id)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_payments_reading ON payments(reading_id)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at)');
+    print('✅ Índices recriados para tabela payments');
+  }
+
+  // Migração para versão 5 - Corrigir tabela readings
+  Future<void> _migrateToVersion5(Database db) async {
+    await db.transaction((txn) async {
+      try {
+        print('🔄 Verificando estrutura da tabela readings...');
+        
+        // Verificar se as colunas necessárias existem na tabela readings
+        final readingsInfo = await txn.rawQuery("PRAGMA table_info(readings)");
+        
+        final hasReadingNumber = readingsInfo.any((col) => col['name'] == 'reading_number');
+        final hasCreatedAt = readingsInfo.any((col) => col['name'] == 'created_at');
+        final hasUpdatedAt = readingsInfo.any((col) => col['name'] == 'updated_at');
+
+        bool needsRecreation = !hasReadingNumber || !hasCreatedAt || !hasUpdatedAt;
+
+        if (needsRecreation) {
+          print('📝 Recriando tabela readings com nova estrutura...');
+          await _recreateReadingsTableWithNewFields(txn);
+        } else {
+          print('ℹ️  Tabela readings já possui todas as colunas necessárias');
+        }
+
+        print('✅ Migração para versão 5 concluída');
+      } catch (e) {
+        print('❌ Erro na migração para versão 5: $e');
+        rethrow;
+      }
+    });
+  }
+
+  // Recriar tabela readings com novos campos
+  Future<void> _recreateReadingsTableWithNewFields(Transaction txn) async {
+    // 1. Criar tabela temporária com nova estrutura
+    await txn.execute('''
+      CREATE TABLE readings_temp (
+        id TEXT PRIMARY KEY,
+        reading_number INTEGER,
+        client_id TEXT NOT NULL,
+        month INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        previous_reading REAL NOT NULL DEFAULT 0.0,
+        current_reading REAL NOT NULL DEFAULT 0.0,
+        consumption REAL NOT NULL DEFAULT 0.0,
+        bill_amount REAL NOT NULL DEFAULT 0.0,
+        reading_date TEXT NOT NULL,
+        payment_status INTEGER NOT NULL DEFAULT 0,
+        payment_date TEXT,
+        notes TEXT,
+        is_synced INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+        UNIQUE(client_id, month, year)
+      )
+    ''');
+    print('✅ Tabela temporária readings_temp criada');
+
+    // 2. Copiar dados existentes (se houver)
+    final existingReadings = await txn.rawQuery('SELECT COUNT(*) as count FROM readings');
+    final count = existingReadings.first['count'] as int;
+    
+    if (count > 0) {
+      final now = DateTime.now().toIso8601String();
+      await txn.execute('''
+        INSERT INTO readings_temp (
+          id, client_id, month, year, previous_reading, current_reading,
+          consumption, bill_amount, reading_date, payment_status, payment_date,
+          notes, is_synced, created_at, updated_at
+        )
+        SELECT 
+          id, client_id, month, year, previous_reading, current_reading,
+          consumption, bill_amount, reading_date, 
+          COALESCE(payment_status, 0) as payment_status, payment_date,
+          notes, COALESCE(is_synced, 0) as is_synced, 
+          COALESCE(created_at, '$now') as created_at,
+          updated_at
+        FROM readings
+      ''');
+      print('✅ $count leituras copiadas para tabela temporária');
+    }
+
+    // 3. Remover tabela antiga
+    await txn.execute('DROP TABLE readings');
+    print('✅ Tabela readings antiga removida');
+
+    // 4. Renomear tabela temporária
+    await txn.execute('ALTER TABLE readings_temp RENAME TO readings');
+    print('✅ Tabela temporária renomeada para readings');
+
+    // 5. Recriar índices
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_readings_client ON readings(client_id)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_readings_month_year ON readings(month, year)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_readings_date ON readings(reading_date)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_readings_status ON readings(payment_status)');
+    await txn.execute('CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)');
+    print('✅ Índices recriados para tabela readings');
+  }
+
+  // Migração para versão 6 - Adicionar coluna is_synced à tabela clients
+  Future<void> _migrateToVersion6(Database db) async {
+    await db.transaction((txn) async {
+      try {
+        print('🔄 Verificando estrutura da tabela clients...');
+        
+        // Verificar se a coluna is_synced já existe na tabela clients
+        final clientsInfo = await txn.rawQuery("PRAGMA table_info(clients)");
+        final hasIsSynced = clientsInfo.any((col) => col['name'] == 'is_synced');
+
+        if (!hasIsSynced) {
+          print('📝 Adicionando coluna is_synced à tabela clients...');
+          
+          // Adicionar coluna is_synced com valor padrão 0 (false)
+          await txn.execute('ALTER TABLE clients ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0');
+          
+          print('✅ Coluna is_synced adicionada à tabela clients');
+        } else {
+          print('ℹ️  Coluna is_synced já existe na tabela clients');
+        }
+
+        print('✅ Migração para versão 6 concluída');
+      } catch (e) {
+        print('❌ Erro na migração para versão 6: $e');
+        rethrow;
+      }
+    });
   }
 
   // Executado quando a base de dados é aberta
@@ -416,6 +674,9 @@ class DatabaseService {
       final hasPaymentsUpdatedAt = paymentsInfo.any(
         (col) => col['name'] == 'updated_at',
       );
+      final hasPaymentNumber = paymentsInfo.any(
+        (col) => col['name'] == 'payment_number',
+      );
 
       // Contar registros na tabela readings
       final totalReadingsResult = await db.rawQuery(
@@ -447,19 +708,22 @@ class DatabaseService {
         'payments': {
           'has_created_at': hasPaymentsCreatedAt,
           'has_updated_at': hasPaymentsUpdatedAt,
+          'has_payment_number': hasPaymentNumber,
           'total_records': totalPayments,
-          'migration_complete': hasPaymentsCreatedAt && hasPaymentsUpdatedAt,
+          'migration_complete': hasPaymentsCreatedAt && hasPaymentsUpdatedAt && hasPaymentNumber,
         },
         'overall_migration_needed':
             !hasReadingsCreatedAt ||
             !hasReadingsUpdatedAt ||
             !hasPaymentsCreatedAt ||
-            !hasPaymentsUpdatedAt,
+            !hasPaymentsUpdatedAt ||
+            !hasPaymentNumber,
         'overall_migration_complete':
             hasReadingsCreatedAt &&
             hasReadingsUpdatedAt &&
             hasPaymentsCreatedAt &&
-            hasPaymentsUpdatedAt,
+            hasPaymentsUpdatedAt &&
+            hasPaymentNumber,
       };
     } catch (e) {
       print('Erro ao verificar status da migração: $e');

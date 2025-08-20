@@ -9,6 +9,25 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
     : super(databaseProvider, 'readings');
 
   @override
+  Future<String> create(ReadingModel model) async {
+    try {
+      // Gerar reading_number se não foi fornecido
+      final readingNumber = model.readingNumber ?? await getNextReadingNumber();
+      
+      // Criar modelo com reading_number
+      final modelWithNumber = model.copyWith(readingNumber: readingNumber);
+      
+      // Chamar create do pai
+      return await super.create(modelWithNumber);
+    } catch (e) {
+      print('Erro ao criar leitura: $e');
+      // Se houver erro, tentar criar sem reading_number
+      final modelWithoutNumber = model.copyWith(readingNumber: null);
+      return await super.create(modelWithoutNumber);
+    }
+  }
+
+  @override
   ReadingModel fromMap(Map<String, dynamic> map) {
     return ReadingModel.fromMap(map);
   }
@@ -73,6 +92,70 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
       tableName,
       where: 'month = ? AND year = ?',
       whereArgs: [month, year],
+      orderBy: 'created_at DESC, reading_date DESC',
+    );
+
+    return results.map((map) => fromMap(map)).toList();
+  }
+
+  // Buscar apenas leituras pendentes (não pagas) de um mês específico
+  Future<List<ReadingModel>> findPendingByMonth(int month, int year) async {
+    final results = await databaseProvider.query(
+      tableName,
+      where: 'month = ? AND year = ? AND payment_status != ?',
+      whereArgs: [month, year, PaymentStatus.paid.index],
+      orderBy: 'created_at DESC, reading_date DESC',
+    );
+
+    return results.map((map) => fromMap(map)).toList();
+  }
+
+  // Buscar leituras que devem virar dívidas (após dia 5 do mês seguinte)
+  Future<List<ReadingModel>> findOverdueReadings() async {
+    final now = DateTime.now();
+    final currentDay = now.day;
+    final currentMonth = now.month;
+    final currentYear = now.year;
+    
+    // LÓGICA CORRIGIDA: 
+    // Se hoje é após dia 5, leituras do mês passado pendentes viram dívida
+    // Mas retorna as leituras que DEVEM ser marcadas como overdue
+    
+    if (currentDay <= 5) {
+      // Ainda estamos dentro do prazo - retornar leituras antigas pendentes
+      var overdueMonth = currentMonth - 1;
+      var overdueYear = currentYear;
+      
+      if (overdueMonth == 0) {
+        overdueMonth = 12;
+        overdueYear -= 1;
+      }
+      
+      // Buscar leituras de meses anteriores que ainda estão pendentes
+      final results = await databaseProvider.query(
+        tableName,
+        where: '(year < ? OR (year = ? AND month < ?)) AND payment_status = ?',
+        whereArgs: [overdueYear, overdueYear, overdueMonth, PaymentStatus.pending.index],
+        orderBy: 'reading_date ASC',
+      );
+
+      return results.map((map) => fromMap(map)).toList();
+    }
+    
+    // Calcular mês anterior
+    var overdueMonth = currentMonth - 1;
+    var overdueYear = currentYear;
+    
+    if (overdueMonth == 0) {
+      overdueMonth = 12;
+      overdueYear -= 1;
+    }
+    
+    // Buscar leituras do mês passado e anteriores que ainda estão pendentes
+    final results = await databaseProvider.query(
+      tableName,
+      where: '(year < ? OR (year = ? AND month <= ?)) AND payment_status = ?',
+      whereArgs: [overdueYear, overdueYear, overdueMonth, PaymentStatus.pending.index],
       orderBy: 'reading_date ASC',
     );
 
@@ -85,7 +168,7 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
       tableName,
       where: 'payment_status = ?',
       whereArgs: [status.index],
-      orderBy: 'reading_date DESC',
+      orderBy: 'created_at DESC, reading_date DESC',
     );
 
     return results.map((map) => fromMap(map)).toList();
@@ -94,6 +177,18 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
   // Buscar contas pendentes
   Future<List<ReadingModel>> findPendingBills() async {
     return await findByPaymentStatus(PaymentStatus.pending);
+  }
+
+  // Buscar contas pendentes para um cliente específico
+  Future<List<ReadingModel>> findPendingBillsByClientId(String clientId) async {
+    final results = await databaseProvider.query(
+      tableName,
+      where: 'client_id = ? AND payment_status = ?',
+      whereArgs: [clientId, PaymentStatus.pending.index],
+      orderBy: 'created_at DESC, year DESC, month DESC',
+    );
+
+    return results.map((map) => fromMap(map)).toList();
   }
 
   // Buscar contas em atraso (mais de 30 dias)
@@ -139,6 +234,23 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
     return count > 0;
   }
 
+  // Atualizar leituras pendentes para overdue automaticamente
+  Future<int> updateOverdueReadings() async {
+    final overdueReadings = await findOverdueReadings();
+    
+    if (overdueReadings.isEmpty) {
+      return 0;
+    }
+    
+    int updated = 0;
+    for (final reading in overdueReadings) {
+      final success = await updatePaymentStatus(reading.id!, PaymentStatus.overdue);
+      if (success) updated++;
+    }
+    
+    return updated;
+  }
+
   // Verificar se leitura já existe para o cliente no mês
   Future<bool> readingExistsForMonth(
     String clientId,
@@ -152,15 +264,37 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
     return count > 0;
   }
 
+  // Gerar próximo número de leitura
+  Future<int> getNextReadingNumber() async {
+    try {
+      final results = await databaseProvider.query(
+        tableName,
+        columns: ['reading_number'],
+        where: 'reading_number IS NOT NULL',
+        orderBy: 'reading_number DESC',
+        limit: 1,
+      );
+
+      if (results.isEmpty) {
+        return 1; // Primeira leitura
+      }
+
+      final lastNumber = results.first['reading_number'] as int?;
+      return (lastNumber ?? 0) + 1;
+    } catch (e) {
+      print('Erro ao obter próximo número de leitura: $e');
+      // Fallback: usar timestamp como número
+      return DateTime.now().millisecondsSinceEpoch % 1000000;
+    }
+  }
+
   // Estatísticas de leituras
   Future<Map<String, dynamic>> getReadingStats({int? month, int? year}) async {
     final stats = <String, dynamic>{};
 
-    String whereClause = '';
     List<dynamic> whereArgs = [];
 
     if (month != null && year != null) {
-      whereClause = 'WHERE month = ? AND year = ?';
       whereArgs = [month, year];
     }
 
@@ -249,5 +383,85 @@ class ReadingRepository extends BaseRepository<ReadingModel> {
       query,
       whereArgs.isEmpty ? null : whereArgs,
     );
+  }
+
+  // Buscar clientes sem leitura em um mês específico
+  Future<List<Map<String, dynamic>>> findClientsWithoutReading(
+    int month,
+    int year,
+  ) async {
+    final query = '''
+      SELECT 
+        c.id,
+        c.name,
+        c.reference,
+        c.counter_number,
+        c.contact,
+        c.address,
+        c.last_reading,
+        c.created_at
+      FROM clients c
+      WHERE c.is_active = 1
+      AND c.id NOT IN (
+        SELECT DISTINCT r.client_id 
+        FROM readings r 
+        WHERE r.month = ? AND r.year = ?
+      )
+      ORDER BY c.name ASC
+    ''';
+
+    return await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+      query,
+      [month, year],
+    );
+  }
+
+  // Relatório completo de leituras não feitas
+  Future<Map<String, dynamic>> getMissingReadingsReport(
+    int month,
+    int year,
+  ) async {
+    final clientsWithoutReadings = await findClientsWithoutReading(month, year);
+    
+    // Contar total de clientes ativos
+    final totalActiveClientsQuery = '''
+      SELECT COUNT(*) as total
+      FROM clients
+      WHERE is_active = 1
+    ''';
+    
+    final totalActiveResult = await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+      totalActiveClientsQuery,
+    );
+
+    // Contar clientes com leituras no mês
+    final clientsWithReadingsQuery = '''
+      SELECT COUNT(DISTINCT r.client_id) as total
+      FROM readings r
+      INNER JOIN clients c ON r.client_id = c.id
+      WHERE r.month = ? AND r.year = ? AND c.is_active = 1
+    ''';
+    
+    final clientsWithReadingsResult = await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+      clientsWithReadingsQuery,
+      [month, year],
+    );
+
+    final totalActiveClients = totalActiveResult.first['total'] ?? 0;
+    final clientsWithReadings = clientsWithReadingsResult.first['total'] ?? 0;
+    final clientsWithoutReadingsCount = clientsWithoutReadings.length;
+
+    return {
+      'month': month,
+      'year': year,
+      'total_active_clients': totalActiveClients,
+      'clients_with_readings': clientsWithReadings,
+      'clients_without_readings_count': clientsWithoutReadingsCount,
+      'missing_percentage': totalActiveClients > 0 ? 
+        ((clientsWithoutReadingsCount * 100.0) / totalActiveClients) : 0.0,
+      'completion_percentage': totalActiveClients > 0 ? 
+        ((clientsWithReadings * 100.0) / totalActiveClients) : 0.0,
+      'clients_without_readings': clientsWithoutReadings,
+    };
   }
 }

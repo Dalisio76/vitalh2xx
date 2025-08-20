@@ -5,6 +5,7 @@ import 'package:vitalh2x/models/cliente_model.dart';
 
 class PaymentModel {
   final String? id;
+  final int? paymentNumber; // Número sequencial do pagamento
   final String clientId;
   final String readingId;
   final double amountPaid;
@@ -18,6 +19,7 @@ class PaymentModel {
 
   PaymentModel({
     this.id,
+    this.paymentNumber,
     required this.clientId,
     required this.readingId,
     required this.amountPaid,
@@ -31,7 +33,7 @@ class PaymentModel {
   });
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'id': id,
       'client_id': clientId,
       'reading_id': readingId,
@@ -44,11 +46,20 @@ class PaymentModel {
       'user_id': userId,
       'is_synced': isSynced ? 1 : 0,
     };
+    
+    // Apenas incluir payment_number se não for null
+    // Isso evita erros caso a coluna não exista ainda no banco
+    if (paymentNumber != null) {
+      map['payment_number'] = paymentNumber;
+    }
+    
+    return map;
   }
 
   factory PaymentModel.fromMap(Map<String, dynamic> map) {
     return PaymentModel(
       id: map['id'],
+      paymentNumber: map.containsKey('payment_number') ? map['payment_number'] : null,
       clientId: map['client_id'],
       readingId: map['reading_id'],
       amountPaid: map['amount_paid']?.toDouble() ?? 0.0,
@@ -99,6 +110,7 @@ class PaymentModel {
 
   PaymentModel copyWith({
     String? id,
+    int? paymentNumber,
     String? clientId,
     String? readingId,
     double? amountPaid,
@@ -112,6 +124,7 @@ class PaymentModel {
   }) {
     return PaymentModel(
       id: id ?? this.id,
+      paymentNumber: paymentNumber ?? this.paymentNumber,
       clientId: clientId ?? this.clientId,
       readingId: readingId ?? this.readingId,
       amountPaid: amountPaid ?? this.amountPaid,

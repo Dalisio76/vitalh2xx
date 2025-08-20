@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +11,6 @@ import 'package:vitalh2x/services/database_providers.dart';
 
 class SyncService extends GetxController {
   static const String _lastSyncKey = 'last_sync_timestamp';
-  static const String _pendingSyncKey = 'pending_sync_items';
 
   // Estado da sincronização
   final RxBool isSyncing = false.obs;

@@ -151,11 +151,9 @@ class PaymentRepository extends BaseRepository<PaymentModel> {
   }) async {
     final stats = <String, dynamic>{};
 
-    String whereClause = '';
     List<dynamic> whereArgs = [];
 
     if (startDate != null && endDate != null) {
-      whereClause = 'WHERE payment_date >= ? AND payment_date <= ?';
       whereArgs = [startDate.toIso8601String(), endDate.toIso8601String()];
     }
 
@@ -237,5 +235,125 @@ class PaymentRepository extends BaseRepository<PaymentModel> {
       query,
       whereArgs.isEmpty ? null : whereArgs,
     );
+  }
+
+  // Relatório de arrecadação por forma de pagamento por mês
+  Future<Map<String, dynamic>> getMonthlyRevenueByPaymentMethod(
+    int month,
+    int year,
+  ) async {
+    final startDate = DateTime(year, month, 1);
+    final endDate = DateTime(year, month + 1, 1).subtract(Duration(days: 1));
+
+    final report = <String, dynamic>{
+      'month': month,
+      'year': year,
+      'total_amount': 0.0,
+      'total_payments': 0,
+      'payment_methods': <String, dynamic>{},
+    };
+
+    // Total geral do mês
+    final totalQuery = '''
+      SELECT 
+        COUNT(*) as total_payments,
+        COALESCE(SUM(amount_paid), 0) as total_amount
+      FROM payments 
+      WHERE payment_date >= ? AND payment_date < ?
+    ''';
+
+    final totalResult = await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+      totalQuery,
+      [startDate.toIso8601String(), endDate.add(Duration(days: 1)).toIso8601String()],
+    );
+
+    report['total_payments'] = totalResult.first['total_payments'] ?? 0;
+    report['total_amount'] = (totalResult.first['total_amount'] as double?) ?? 0.0;
+
+    // Por cada método de pagamento
+    for (PaymentMethod method in PaymentMethod.values) {
+      final methodQuery = '''
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(amount_paid), 0) as amount,
+          ROUND((COALESCE(SUM(amount_paid), 0) * 100.0 / ?), 2) as percentage
+        FROM payments 
+        WHERE payment_method = ? 
+        AND payment_date >= ? AND payment_date < ?
+      ''';
+
+      final methodResult = await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+        methodQuery,
+        [
+          report['total_amount'] > 0 ? report['total_amount'] : 1, // Evitar divisão por zero
+          method.index,
+          startDate.toIso8601String(),
+          endDate.add(Duration(days: 1)).toIso8601String(),
+        ],
+      );
+
+      final methodData = methodResult.first;
+      report['payment_methods'][method.name] = {
+        'display_name': method.displayName,
+        'count': methodData['count'] ?? 0,
+        'amount': (methodData['amount'] as double?) ?? 0.0,
+        'percentage': report['total_amount'] > 0 ? (methodData['percentage'] as double?) ?? 0.0 : 0.0,
+      };
+    }
+
+    return report;
+  }
+
+  // Relatório de arrecadação anual com breakdown por mês
+  Future<Map<String, dynamic>> getYearlyRevenueReport(int year) async {
+    final report = <String, dynamic>{
+      'year': year,
+      'total_amount': 0.0,
+      'total_payments': 0,
+      'monthly_breakdown': <Map<String, dynamic>>[],
+      'payment_methods_summary': <String, dynamic>{},
+    };
+
+    // Para cada mês do ano
+    for (int month = 1; month <= 12; month++) {
+      final monthlyReport = await getMonthlyRevenueByPaymentMethod(month, year);
+      report['monthly_breakdown'].add(monthlyReport);
+      
+      // Somar ao total anual
+      report['total_amount'] = (report['total_amount'] as double) + (monthlyReport['total_amount'] as double);
+      report['total_payments'] = (report['total_payments'] as int) + (monthlyReport['total_payments'] as int);
+    }
+
+    // Resumo por método de pagamento no ano
+    for (PaymentMethod method in PaymentMethod.values) {
+      final yearMethodQuery = '''
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(amount_paid), 0) as amount
+        FROM payments 
+        WHERE payment_method = ? 
+        AND payment_date >= ? AND payment_date < ?
+      ''';
+
+      final yearMethodResult = await (databaseProvider as SQLiteDatabaseProvider).rawQuery(
+        yearMethodQuery,
+        [
+          method.index,
+          DateTime(year, 1, 1).toIso8601String(),
+          DateTime(year + 1, 1, 1).toIso8601String(),
+        ],
+      );
+
+      final methodData = yearMethodResult.first;
+      final amount = (methodData['amount'] as double?) ?? 0.0;
+      report['payment_methods_summary'][method.name] = {
+        'display_name': method.displayName,
+        'count': methodData['count'] ?? 0,
+        'amount': amount,
+        'percentage': report['total_amount'] > 0 ? (amount * 100.0 / (report['total_amount'] as double)) : 0.0,
+      };
+    }
+
+    return report;
   }
 }

@@ -1,4 +1,5 @@
-import 'package:vitalh2x/models/cliente_model.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/repository/base_repository.dart';
 import 'package:vitalh2x/services/database_providers.dart';
@@ -35,14 +36,22 @@ class UserRepository extends BaseRepository<UserModel> {
     final user = await findByEmail(email);
     if (user == null) return null;
 
-    // TODO: Implementar verificação de hash da senha
-    if (user.passwordHash == password) {
+    // Verificar hash da senha
+    final hashedPassword = _hashPassword(password);
+    if (user.passwordHash == hashedPassword) {
       // Atualizar último login
       await updateLastLogin(user.id!);
       return user;
     }
 
     return null;
+  }
+
+  // Hash da senha usando SHA256 (mesmo método do DatabaseService)
+  String _hashPassword(String password) {
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   // Atualizar último login

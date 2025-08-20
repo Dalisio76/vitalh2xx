@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
-import 'package:vitalh2x/services/app_config.dart';
-import 'package:vitalh2x/services/http_service.dart';
+import 'package:vitalh2x/repository/user_repository.dart';
+import 'package:vitalh2x/services/database_providers.dart';
 
 class AuthService extends GetxController {
+  // Repositório de usuários
+  late final UserRepository _userRepository;
+  
   // Estado reativo do usuário
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final RxBool isLoggedIn = false.obs;
@@ -14,7 +18,13 @@ class AuthService extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _initializeRepository();
     _initializeAuth();
+  }
+
+  void _initializeRepository() {
+    final databaseProvider = SQLiteDatabaseProvider();
+    _userRepository = UserRepository(databaseProvider);
   }
 
   // Inicializar autenticação ao abrir app
@@ -22,16 +32,16 @@ class AuthService extends GetxController {
     isLoading.value = true;
     
     try {
-      // Verificar se tem token salvo
-      final token = await _getStoredToken();
-      if (token != null) {
-        // Verificar se token ainda é válido
-        final userData = await HttpService.getCurrentUser();
-        if (userData != null) {
-          currentUser.value = UserModel.fromJson(userData);
+      // Verificar se tem usuário salvo localmente
+      final userId = await _getStoredUserId();
+      if (userId != null) {
+        // Buscar usuário no banco local
+        final user = await _userRepository.findById(userId);
+        if (user != null && user.isActive) {
+          currentUser.value = user;
           isLoggedIn.value = true;
         } else {
-          // Token inválido, limpar dados
+          // Usuário inválido, limpar dados
           await logout();
         }
       }
@@ -52,25 +62,22 @@ class AuthService extends GetxController {
     isLoading.value = true;
 
     try {
-      final success = await HttpService.login(email, password);
+      // Autenticação local usando UserRepository
+      final user = await _userRepository.authenticate(email, password);
       
-      if (success) {
-        // Buscar dados atualizados do usuário
-        final userData = await HttpService.getCurrentUser();
-        if (userData != null) {
-          currentUser.value = UserModel.fromJson(userData);
-          isLoggedIn.value = true;
-          
-          // Salvar último login
-          await _updateLastLogin();
-          
-          return AuthResult.success('Login realizado com sucesso');
-        }
+      if (user != null) {
+        currentUser.value = user;
+        isLoggedIn.value = true;
+        
+        // Salvar ID do usuário para sessões futuras
+        await _storeUserId(user.id!);
+        
+        return AuthResult.success('Login realizado com sucesso');
       }
       
-      return AuthResult.error('Credenciais inválidas');
+      return AuthResult.error('Email ou senha incorretos');
     } catch (e) {
-      return AuthResult.error('Erro de conexão: $e');
+      return AuthResult.error('Erro ao fazer login: $e');
     } finally {
       isLoading.value = false;
     }
@@ -81,8 +88,8 @@ class AuthService extends GetxController {
     isLoading.value = true;
 
     try {
-      // Fazer logout no servidor
-      await HttpService.logout();
+      // Limpar dados salvos localmente
+      await _clearStoredUserId();
     } catch (e) {
       print('Erro no logout: $e');
     } finally {
@@ -151,8 +158,8 @@ class AuthService extends GetxController {
   // Verificar se é operador de campo
   bool get isFieldOperator => currentUser.value?.role == UserRole.fieldOperator;
 
-  // Atualizar perfil do usuário
-  Future<AuthResult> updateProfile(Map<String, dynamic> data) async {
+  // Atualizar perfil do usuário (localmente)
+  Future<AuthResult> updateProfile(UserModel updatedUser) async {
     if (currentUser.value == null) {
       return AuthResult.error('Usuário não autenticado');
     }
@@ -160,17 +167,17 @@ class AuthService extends GetxController {
     isLoading.value = true;
 
     try {
-      final response = await HttpService.put<Map<String, dynamic>>(
-        AppConfig.buildUserUrl(currentUser.value!.id),
-        data,
+      updatedUser = updatedUser.copyWith(
+        updatedAt: DateTime.now(),
       );
-
-      if (response.success && response.data != null) {
-        currentUser.value = UserModel.fromJson(response.data!);
+      
+      final success = await _userRepository.update(updatedUser.id!, updatedUser);
+      if (success) {
+        currentUser.value = updatedUser;
         return AuthResult.success('Perfil atualizado com sucesso');
       }
 
-      return AuthResult.error(response.message);
+      return AuthResult.error('Erro ao atualizar perfil');
     } catch (e) {
       return AuthResult.error('Erro ao atualizar perfil: $e');
     } finally {
@@ -178,7 +185,7 @@ class AuthService extends GetxController {
     }
   }
 
-  // Alterar senha
+  // Alterar senha (localmente)
   Future<AuthResult> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -199,20 +206,29 @@ class AuthService extends GetxController {
     isLoading.value = true;
 
     try {
-      final response = await HttpService.put<Map<String, dynamic>>(
-        '${AppConfig.buildUserUrl(currentUser.value!.id)}/change-password',
-        {
-          'current_password': currentPassword,
-          'new_password': newPassword,
-          'confirm_password': confirmPassword,
-        },
+      // Verificar senha atual
+      final user = await _userRepository.authenticate(
+        currentUser.value!.email,
+        currentPassword,
+      );
+      
+      if (user == null) {
+        return AuthResult.error('Senha atual incorreta');
+      }
+
+      // Atualizar com nova senha
+      final updatedUser = currentUser.value!.copyWith(
+        passwordHash: _hashPassword(newPassword),
+        updatedAt: DateTime.now(),
       );
 
-      if (response.success) {
+      final success = await _userRepository.update(updatedUser.id!, updatedUser);
+      if (success) {
+        currentUser.value = updatedUser;
         return AuthResult.success('Senha alterada com sucesso');
       }
 
-      return AuthResult.error(response.message);
+      return AuthResult.error('Erro ao alterar senha');
     } catch (e) {
       return AuthResult.error('Erro ao alterar senha: $e');
     } finally {
@@ -220,35 +236,41 @@ class AuthService extends GetxController {
     }
   }
 
+  // Hash da senha (mesmo método do UserRepository e DatabaseService)
+  String _hashPassword(String password) {
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   // Refresh dos dados do usuário
   Future<void> refreshUserData() async {
-    if (!isLoggedIn.value) return;
+    if (!isLoggedIn.value || currentUser.value == null) return;
 
     try {
-      final userData = await HttpService.getCurrentUser();
-      if (userData != null) {
-        currentUser.value = UserModel.fromJson(userData);
+      final user = await _userRepository.findById(currentUser.value!.id!);
+      if (user != null) {
+        currentUser.value = user;
       }
     } catch (e) {
       print('Erro ao atualizar dados do usuário: $e');
     }
   }
 
-  // Helpers privados
-  Future<String?> _getStoredToken() async {
+  // Helpers privados para autenticação local
+  Future<String?> _getStoredUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(AppConfig.tokenKey);
+    return prefs.getString('current_user_id');
   }
 
-  Future<void> _updateLastLogin() async {
-    try {
-      await HttpService.put<Map<String, dynamic>>(
-        '${AppConfig.buildUserUrl(currentUser.value!.id)}/last-login',
-        {'last_login': DateTime.now().toIso8601String()},
-      );
-    } catch (e) {
-      print('Erro ao atualizar último login: $e');
-    }
+  Future<void> _storeUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('current_user_id', userId);
+  }
+
+  Future<void> _clearStoredUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('current_user_id');
   }
 
   // Método para guard de rotas

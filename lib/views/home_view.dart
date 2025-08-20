@@ -21,6 +21,11 @@ class HomeView extends StatelessWidget {
         title: Text('Início'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _refreshData(),
+            tooltip: 'Atualizar sistema',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Get.toNamed('/settings'),
           ),
@@ -162,28 +167,28 @@ class HomeView extends StatelessWidget {
                       color: Colors.green,
                       onTap: () => Get.toNamed('/readings'),
                     ),
-                    StatsCard(
-                      title: 'Contas Pendentes',
-                      value:
-                          '${readingController.monthlyStats['pending'] ?? 0}',
-                      icon: Icons.pending_actions,
-                      color: Colors.orange,
-                      onTap:
-                          DI.canRegisterPayments
-                              ? () => RouteHelper.toPayments()
-                              : null,
-                    ),
-                    StatsCard(
-                      title: 'Arrecadado',
-                      value:
-                          '${(paymentController.paymentStats['total_amount'] ?? 0.0).toStringAsFixed(0)} MT',
-                      icon: Icons.monetization_on,
-                      color: Colors.purple,
-                      onTap:
-                          DI.canRegisterPayments
-                              ? () => RouteHelper.toPayments()
-                              : null,
-                    ),
+                    // StatsCard(
+                    //   title: 'Contas Pendentes',
+                    //   value:
+                    //       '${readingController.monthlyStats['pending'] ?? 0}',
+                    //   icon: Icons.pending_actions,
+                    //   color: Colors.orange,
+                    //   onTap:
+                    //       DI.canRegisterPayments
+                    //           ? () => RouteHelper.toPayments()
+                    //           : null,
+                    // ),
+                    // StatsCard(
+                    //   title: 'Arrecadado',
+                    //   value:
+                    //       '${(paymentController.paymentStats['total_amount'] ?? 0.0).toStringAsFixed(0)} MT',
+                    //   icon: Icons.monetization_on,
+                    //   color: Colors.purple,
+                    //   onTap:
+                    //       DI.canRegisterPayments
+                    //           ? () => RouteHelper.toPayments()
+                    //           : null,
+                    // ),
                   ],
                 );
               },
@@ -224,6 +229,14 @@ class HomeView extends StatelessWidget {
       'onTap': () => Get.toNamed('/readings/form'),
     });
 
+    actions.add({
+      'title': 'Área de Leituras',
+      'subtitle': 'Ver apenas leituras',
+      'icon': Icons.speed,
+      'color': Colors.blue[600]!,
+      'onTap': () => Get.toNamed('/readings/only'),
+    });
+
     // Admin and Cashier can register clients
     if (DI.canRegisterClients) {
       actions.add({
@@ -244,6 +257,14 @@ class HomeView extends StatelessWidget {
         'color': Colors.orange,
         'onTap': () => Get.toNamed('/payments/form'),
       });
+
+      actions.add({
+        'title': 'Gestão de Dívidas',
+        'subtitle': 'Contas pendentes e atrasadas',
+        'icon': Icons.warning,
+        'color': Colors.red[600]!,
+        'onTap': () => Get.toNamed('/debts/management'),
+      });
     }
 
     // Admin and Cashier can view reports
@@ -254,6 +275,17 @@ class HomeView extends StatelessWidget {
         'icon': Icons.analytics,
         'color': Colors.purple,
         'onTap': () => RouteHelper.toReports(),
+      });
+    }
+
+    // Only Admin can manage users
+    if (DI.isAdmin) {
+      actions.add({
+        'title': 'Gerenciar Usuários',
+        'subtitle': 'Administrar usuários do sistema',
+        'icon': Icons.people,
+        'color': Colors.red,
+        'onTap': () => Get.toNamed('/users'),
       });
     }
 
@@ -377,15 +409,37 @@ class HomeView extends StatelessWidget {
 
   Future<void> _refreshData() async {
     try {
+      // Mostrar feedback de carregamento
+      Get.snackbar(
+        'Atualizando',
+        'Carregando dados mais recentes...',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+
       // Refresh all data
       await DI.client.refreshData();
       await DI.reading.refreshData();
       await DI.payment.refreshData();
+
+      // Mostrar feedback de sucesso
+      Get.snackbar(
+        'Atualizado',
+        'Sistema atualizado com sucesso!',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
     } catch (e) {
       Get.snackbar(
         'Erro',
         'Erro ao atualizar dados: $e',
         snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
     }
   }

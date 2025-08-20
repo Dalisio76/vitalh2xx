@@ -7,10 +7,10 @@ import 'package:vitalh2x/controlers/client_controller.dart';
 import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/controlers/reading_controller.dart';
 import 'package:vitalh2x/controlers/report_controller.dart';
-import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/services/database_providers.dart';
 import 'package:vitalh2x/services/database_services.dart';
+import 'package:vitalh2x/services/print_service.dart';
 
 class DI {
   // Initialize core dependencies
@@ -19,6 +19,7 @@ class DI {
     Get.put<DatabaseService>(DatabaseService(), permanent: true);
     Get.put<DatabaseProvider>(SQLiteDatabaseProvider(), permanent: true);
     Get.put<AuthController>(AuthController(), permanent: true);
+    Get.put<PrintService>(PrintService(), permanent: true);
   }
 
   // Controllers - Lazy loading with getters
@@ -47,6 +48,7 @@ class DI {
   // Services
   static DatabaseService get database => Get.find<DatabaseService>();
   static DatabaseProvider get databaseProvider => Get.find<DatabaseProvider>();
+  static PrintService get printService => Get.find<PrintService>();
 
   // Check permissions using auth controller
   static bool get canRegisterClients => auth.canRegisterClients();

@@ -11,6 +11,7 @@ import 'package:vitalh2x/controlers/report_controller.dart';
 import 'package:vitalh2x/routs/rout.dart';
 import 'package:vitalh2x/widgets/dashboard_card.dart';
 import 'package:vitalh2x/widgets/simple_bar_chart.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
 class DashboardView extends StatelessWidget {
   const DashboardView({Key? key}) : super(key: key);
@@ -18,29 +19,41 @@ class DashboardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Dashboard')),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        backgroundColor: AppStyles.primaryColor,
+        foregroundColor: Colors.white,
+        toolbarHeight: 48,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: _refreshData,
+            tooltip: 'Atualizar dados',
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refreshData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header with current month
               _buildHeader(),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 6),
 
               // Key metrics
               _buildKeyMetrics(),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 6),
 
               // Charts section
               _buildChartsSection(),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 6),
 
               // Quick insights
               _buildQuickInsights(),
@@ -54,33 +67,34 @@ class DashboardView extends StatelessWidget {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      height: 60,
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.indigo, Colors.indigo.withOpacity(0.8)],
+          colors: [
+            AppStyles.primaryColor,
+            AppStyles.primaryColor.withOpacity(0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Dashboard Administrativo',
-            style: TextStyle(
-              fontSize: 24,
+          Text(
+            'Dashboard - ${_getCurrentMonth()}',
+            style: const TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Text(
-            'Visão geral do sistema - ${_getCurrentMonth()}',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
-            ),
+            'Sistema VitalH2X',
+            style: const TextStyle(fontSize: 9, color: Colors.white),
           ),
         ],
       ),
@@ -96,10 +110,10 @@ class DashboardView extends StatelessWidget {
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.3,
+          crossAxisCount: 4,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
+          childAspectRatio: 1.8,
           children: [
             DashboardCard(
               title: 'Clientes Totais',
@@ -146,40 +160,33 @@ class DashboardView extends StatelessWidget {
       children: [
         Text(
           'Análise Mensal',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
+          style: AppStyles.compactTitle.copyWith(color: Colors.grey[800]),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppStyles.paddingLarge),
 
         // Payment Methods Chart
         GetBuilder<PaymentController>(
           init: DI.payment,
           builder: (controller) {
             return Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppStyles.paddingLarge),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(4),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.grey.withOpacity(0.1),
                     spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Formas de Pagamento',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
+                  Text('Formas de Pagamento', style: AppStyles.compactSubtitle),
+                  const SizedBox(height: AppStyles.paddingLarge),
                   SimpleBarChart(
                     data: _getPaymentMethodData(controller.paymentStats),
                   ),
@@ -198,13 +205,9 @@ class DashboardView extends StatelessWidget {
       children: [
         Text(
           'Insights Rápidos',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
+          style: AppStyles.compactTitle.copyWith(color: Colors.grey[800]),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppStyles.paddingLarge),
 
         GetBuilder<ClientController>(
           init: DI.client,
@@ -223,14 +226,14 @@ class DashboardView extends StatelessWidget {
                       () => Get.toNamed(Routes.HOME),
                     ),
 
-                    _buildInsightTile(
-                      'Contas Pendentes',
-                      '${readingController.monthlyStats['pending'] ?? 0} contas',
-                      Icons.pending_actions,
-                      Colors.orange,
-                      () => Get.toNamed('/payments'),
-                    ),
-
+                    // Comentado - vai para mesma view de pagamentos
+                    // _buildInsightTile(
+                    //   'Contas Pendentes',
+                    //   '${readingController.monthlyStats['pending'] ?? 0} contas',
+                    //   Icons.pending_actions,
+                    //   Colors.orange,
+                    //   () => Get.toNamed('/payments'),
+                    // ),
                     _buildInsightTile(
                       'Eficiência de Cobrança',
                       '${((readingController?.monthlyStats['paid'] ?? 0) / (readingController?.monthlyStats['total'] ?? 1) * 100).toStringAsFixed(1)}%',
@@ -256,41 +259,68 @@ class DashboardView extends StatelessWidget {
     VoidCallback onTap,
   ) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppStyles.paddingMedium),
       child: ListTile(
         leading: CircleAvatar(
+          radius: 16,
           backgroundColor: color.withOpacity(0.1),
-          child: Icon(icon, color: color),
+          child: Icon(icon, color: color, size: 16),
         ),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          style: AppStyles.compactBody.copyWith(fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
           value,
-          style: TextStyle(
+          style: AppStyles.compactSubtitle.copyWith(
             color: color,
             fontWeight: FontWeight.bold,
-            fontSize: 16,
           ),
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: const Icon(Icons.chevron_right, size: 16),
         onTap: onTap,
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppStyles.paddingLarge,
+          vertical: AppStyles.paddingSmall,
+        ),
       ),
     );
   }
 
   Future<void> _refreshData() async {
     try {
+      // Mostrar feedback de carregamento
+      Get.snackbar(
+        'Atualizando',
+        'Carregando dados mais recentes...',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+
       await DI.report.refreshAllReports();
       await DI.client.refreshData();
       await DI.reading.refreshData();
       await DI.payment.refreshData();
+
+      // Mostrar feedback de sucesso
+      Get.snackbar(
+        'Atualizado',
+        'Dados atualizados com sucesso!',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
     } catch (e) {
       Get.snackbar(
         'Erro',
         'Erro ao atualizar dados: $e',
         snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
     }
   }

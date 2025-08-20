@@ -2,6 +2,7 @@
 // lib/app/widgets/cards/dashboard_card.dart
 
 import 'package:flutter/material.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
 class DashboardCard extends StatelessWidget {
   final String title;
@@ -26,15 +27,15 @@ class DashboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(4),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(4),
             gradient: LinearGradient(
               colors: [color.withOpacity(0.05), color.withOpacity(0.02)],
               begin: Alignment.topLeft,
@@ -50,38 +51,37 @@ class DashboardCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: AppStyles.compactCaption.copyWith(
                         fontWeight: FontWeight.w500,
                         color: Colors.grey[600],
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Icon(icon, color: color, size: 24),
+                    child: Icon(icon, color: color, size: 12),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 2),
 
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 1),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -90,7 +90,10 @@ class DashboardCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         subtitle!,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: const TextStyle(
+                          fontSize: 8,
+                          color: Colors.grey,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -98,26 +101,26 @@ class DashboardCard extends StatelessWidget {
                   if (trend != null)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 2,
+                        vertical: 1,
                       ),
                       decoration: BoxDecoration(
                         color: _getTrendColor().withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             _getTrendIcon(),
-                            size: 12,
+                            size: 8,
                             color: _getTrendColor(),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 1),
                           Text(
                             trend!,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 7,
                               fontWeight: FontWeight.w600,
                               color: _getTrendColor(),
                             ),

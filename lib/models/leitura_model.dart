@@ -5,6 +5,7 @@ import 'package:vitalh2x/models/metodo_pagamento_model.dart';
 
 class ReadingModel {
   final String? id;
+  final int? readingNumber; // Número sequencial da leitura
   final String clientId;
   final int month;
   final int year;
@@ -17,9 +18,12 @@ class ReadingModel {
   final DateTime? paymentDate;
   final String? notes;
   final bool isSynced;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   ReadingModel({
     this.id,
+    this.readingNumber,
     required this.clientId,
     required this.month,
     required this.year,
@@ -32,6 +36,8 @@ class ReadingModel {
     this.paymentDate,
     this.notes,
     this.isSynced = false,
+    this.createdAt,
+    this.updatedAt,
   });
 
   // Calcular consumo automaticamente
@@ -47,6 +53,7 @@ class ReadingModel {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'reading_number': readingNumber,
       'client_id': clientId,
       'month': month,
       'year': year,
@@ -59,12 +66,15 @@ class ReadingModel {
       'payment_date': paymentDate?.toIso8601String(),
       'notes': notes,
       'is_synced': isSynced ? 1 : 0,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
   factory ReadingModel.fromMap(Map<String, dynamic> map) {
     return ReadingModel(
       id: map['id'],
+      readingNumber: map['reading_number'],
       clientId: map['client_id'],
       month: map['month'],
       year: map['year'],
@@ -80,6 +90,12 @@ class ReadingModel {
               : null,
       notes: map['notes'],
       isSynced: map['is_synced'] == 1,
+      createdAt: map['created_at'] != null 
+          ? DateTime.parse(map['created_at'])
+          : null,
+      updatedAt: map['updated_at'] != null 
+          ? DateTime.parse(map['updated_at'])
+          : null,
     );
   }
 
@@ -127,6 +143,7 @@ class ReadingModel {
 
   ReadingModel copyWith({
     String? id,
+    int? readingNumber,
     String? clientId,
     int? month,
     int? year,
@@ -139,9 +156,12 @@ class ReadingModel {
     DateTime? paymentDate,
     String? notes,
     bool? isSynced,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return ReadingModel(
       id: id ?? this.id,
+      readingNumber: readingNumber ?? this.readingNumber,
       clientId: clientId ?? this.clientId,
       month: month ?? this.month,
       year: year ?? this.year,
@@ -154,6 +174,8 @@ class ReadingModel {
       paymentDate: paymentDate ?? this.paymentDate,
       notes: notes ?? this.notes,
       isSynced: isSynced ?? this.isSynced,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

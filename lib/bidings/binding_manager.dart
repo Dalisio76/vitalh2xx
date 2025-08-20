@@ -2,7 +2,6 @@
 // lib/app/bindings/binding_manager.dart
 
 import 'package:get/get.dart';
-import 'package:vitalh2x/bidings/HomeBinding.dart';
 import 'package:vitalh2x/bidings/InitialBinding.dart';
 import 'package:vitalh2x/bidings/admin_binding.dart';
 import 'package:vitalh2x/bidings/cashier_binding.dart';
@@ -12,7 +11,6 @@ import 'package:vitalh2x/controlers/client_controller.dart';
 import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/controlers/reading_controller.dart';
 import 'package:vitalh2x/controlers/report_controller.dart';
-import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
 
 class BindingManager {
@@ -25,8 +23,6 @@ class BindingManager {
         return CashierBinding();
       case UserRole.fieldOperator:
         return FieldOperationBinding();
-      default:
-        return HomeBinding();
     }
   }
 

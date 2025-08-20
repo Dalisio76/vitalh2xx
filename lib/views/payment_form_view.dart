@@ -3,14 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
-import 'package:vitalh2x/models/metodo_pagamento_model.dart';
 
 class PaymentFormView extends GetView<PaymentController> {
   const PaymentFormView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Verificar argumentos pré-carregados apenas após o build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndLoadPreloadedData();
+      // Também tentar via controller
+      controller.checkForPreloadedDataFromView();
+    });
+    
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // Garantir que volta para a tela anterior corretamente
+        if (!didPop) {
+          Get.back();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Processar Pagamento'),
         backgroundColor: Colors.green[600],
@@ -49,6 +63,7 @@ class PaymentFormView extends GetView<PaymentController> {
           ),
         );
       }),
+      ),
     );
   }
 
@@ -59,15 +74,55 @@ class PaymentFormView extends GetView<PaymentController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Buscar Cliente',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                const Text(
+                  'Buscar Cliente',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                // Show indicator if data was pre-loaded
+                Obx(() {
+                  if (controller.selectedClient.value != null && 
+                      Get.arguments != null && 
+                      Get.arguments is Map && 
+                      (Get.arguments as Map)['preloaded'] == true) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green[300]!),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green[800], size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            'PRÉ-CARREGADO',
+                            style: TextStyle(
+                              color: Colors.green[800],
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+              ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
+                  child: Obx(() => TextFormField(
+                    controller: TextEditingController(
+                      text: controller.clientReference.value,
+                    ),
                     onChanged:
                         (value) => controller.clientReference.value = value,
                     decoration: const InputDecoration(
@@ -76,7 +131,7 @@ class PaymentFormView extends GetView<PaymentController> {
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.search),
                     ),
-                  ),
+                  )),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
@@ -130,6 +185,8 @@ class PaymentFormView extends GetView<PaymentController> {
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                         Text(
                           'Ref: ${client.reference}',
@@ -137,6 +194,8 @@ class PaymentFormView extends GetView<PaymentController> {
                             color: Colors.grey[600],
                             fontSize: 14,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                         if (client.contact.isNotEmpty)
                           Text(
@@ -145,6 +204,8 @@ class PaymentFormView extends GetView<PaymentController> {
                               color: Colors.grey[600],
                               fontSize: 14,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                       ],
                     ),
@@ -503,7 +564,7 @@ class PaymentFormView extends GetView<PaymentController> {
                             const SizedBox(width: 8),
                             const Expanded(
                               child: Text(
-                                'Valor insuficiente para quitar a conta',
+                                'Valor insuficiente para o pagamento',
                                 style: TextStyle(fontSize: 12),
                               ),
                             ),
@@ -939,5 +1000,28 @@ class PaymentFormView extends GetView<PaymentController> {
       'Dezembro',
     ];
     return months[month - 1];
+  }
+
+  void _checkAndLoadPreloadedData() {
+    // Usar Future.microtask para evitar problemas durante o build
+    Future.microtask(() {
+      final arguments = Get.arguments;
+      
+      if (arguments != null && arguments is Map) {
+        final isPreloaded = arguments['preloaded'] as bool? ?? false;
+        
+        if (isPreloaded) {
+          final reading = arguments['reading'];
+          final client = arguments['client'];
+          
+          if (reading != null && client != null) {
+            controller.loadPreloadedData(client, reading);
+          } else if (reading != null) {
+            // Carregar cliente a partir da leitura
+            controller.loadPreloadedDataFromReading(reading);
+          }
+        }
+      }
+    });
   }
 }

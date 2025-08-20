@@ -4,6 +4,7 @@ import 'package:vitalh2x/controlers/payment_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/pagamento_model.dart';
 import 'package:vitalh2x/routs/rout.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
 class PaymentListView extends GetView<PaymentController> {
   const PaymentListView({Key? key}) : super(key: key);
@@ -13,22 +14,26 @@ class PaymentListView extends GetView<PaymentController> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lista de Pagamentos'),
-        backgroundColor: Colors.green[600],
+        backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
+        toolbarHeight: 48,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(Icons.search, size: 20),
             onPressed: () => _showSearchDialog(),
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list, size: 20),
             onPressed: () => _showFilterOptions(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: () => controller.refreshData(),
           ),
         ],
       ),
       body: Column(
         children: [
-          _buildQuickFilters(),
           _buildStatsBar(),
           Expanded(child: _buildPaymentsList()),
         ],
@@ -90,10 +95,13 @@ class PaymentListView extends GetView<PaymentController> {
 
   Widget _buildStatsBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppStyles.paddingLarge,
+        vertical: AppStyles.paddingMedium,
+      ),
       decoration: BoxDecoration(
-        color: Colors.green[50],
-        border: Border(bottom: BorderSide(color: Colors.green[200]!)),
+        color: AppStyles.primaryColor.withOpacity(0.1),
+        border: Border(bottom: BorderSide(color: AppStyles.primaryColor.withOpacity(0.3))),
       ),
       child: Obx(() {
         final stats = controller.paymentStats.value;
@@ -103,38 +111,55 @@ class PaymentListView extends GetView<PaymentController> {
         return Row(
           children: [
             Expanded(
-              child: Row(
-                children: [
-                  Icon(Icons.receipt, size: 16, color: Colors.green[700]),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$totalPayments pagamentos',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.green[700],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              child: _buildStatItem(
+                'Total',
+                '$totalPayments',
+                Icons.receipt,
+                AppStyles.primaryColor,
               ),
             ),
-            Row(
-              children: [
-                Icon(Icons.monetization_on, size: 16, color: Colors.green[700]),
-                const SizedBox(width: 8),
-                Text(
-                  '${totalAmount.toStringAsFixed(2)} MT',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.green[700],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            Container(height: 24, width: 1, color: AppStyles.primaryColor.withOpacity(0.3)),
+            Expanded(
+              child: _buildStatItem(
+                'Receita',
+                '${totalAmount.toStringAsFixed(0)} MT',
+                Icons.monetization_on,
+                AppStyles.secondaryColor,
+              ),
             ),
           ],
         );
       }),
+    );
+  }
+
+  Widget _buildStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(width: AppStyles.paddingSmall),
+        Column(
+          children: [
+            Text(
+              value,
+              style: AppStyles.compactSubtitle.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              label, 
+              style: AppStyles.compactCaption,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -151,16 +176,190 @@ class PaymentListView extends GetView<PaymentController> {
 
       return RefreshIndicator(
         onRefresh: () => controller.refreshData(),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: history.length,
-          itemBuilder: (context, index) {
-            final payment = history[index];
-            return _buildPaymentCard(payment, index);
-          },
-        ),
+        child: _buildDataGrid(history),
       );
     });
+  }
+
+  Widget _buildDataGrid(List<Map<String, dynamic>> payments) {
+    return Container(
+      margin: const EdgeInsets.all(AppStyles.paddingSmall),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Column(
+        children: [
+          // Header Row
+          Container(
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border(bottom: BorderSide(color: Colors.grey[400]!)),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 3, child: _buildHeaderCellExpanded('CLIENTE')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('DATA')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('VALOR')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('MÉTODO')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('RECIBO')),
+                Expanded(flex: 2, child: _buildHeaderCellExpanded('STATUS')),
+              ],
+            ),
+          ),
+          // Data Rows
+          Expanded(
+            child: ListView.builder(
+              itemCount: payments.length,
+              itemBuilder: (context, index) {
+                final payment = payments[index];
+                return _buildDataRow(payment, index);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCellExpanded(String text) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[300]!, width: 0.5)),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataRow(Map<String, dynamic> payment, int index) {
+    final clientName = payment['client_name'] ?? 'Cliente não encontrado';
+    final amount = (payment['amount_paid'] ?? 0.0).toDouble();
+    final method = payment['payment_method'] ?? 0;
+    final paymentDate = DateTime.tryParse(payment['payment_date'] ?? '') ?? DateTime.now();
+    final receiptNumber = payment['receipt_number'] ?? '';
+    
+    return InkWell(
+      onTap: () => _showPaymentActions(payment),
+      child: Container(
+        height: 20,
+        decoration: BoxDecoration(
+          color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+          border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: _buildDataCellExpanded(
+                Text(clientName, style: const TextStyle(fontSize: 9))
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildDataCellExpanded(
+                Text(_formatDate(paymentDate), style: const TextStyle(fontSize: 9))
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildDataCellExpanded(
+                Text(
+                  '${amount.toStringAsFixed(2)} MT',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildDataCellExpanded(
+                Text(
+                  _getMethodAbbrev(PaymentMethod.values[method]),
+                  style: const TextStyle(fontSize: 9)
+                )
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildDataCellExpanded(
+                Text(receiptNumber, style: const TextStyle(fontSize: 9))
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildDataCellExpanded(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: const Text(
+                    'PAGO',
+                    style: TextStyle(
+                      fontSize: 7,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataCellExpanded(Widget child) {
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.grey[200]!, width: 0.5)),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: child,
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+  }
+
+  String _getMethodAbbrev(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return 'CASH';
+      case PaymentMethod.bankTransfer:
+        return 'TRANS';
+      case PaymentMethod.mobileMoney:
+        return 'MOBILE';
+      case PaymentMethod.check:
+        return 'CHECK';
+      case PaymentMethod.other:
+      default:
+        return 'OUTRO';
+    }
   }
 
   Widget _buildEmptyState() {

@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/bidings/dependency_injection.dart';
 import 'package:vitalh2x/controlers/report_controller.dart';
+import 'package:vitalh2x/views/payments_report_view.dart';
+import 'package:vitalh2x/views/readings_report_view.dart';
+import 'package:vitalh2x/views/pending_bills_report_view.dart';
+import 'package:vitalh2x/views/debts_report_view.dart';
+import 'package:vitalh2x/views/paid_bills_report_view.dart';
+import 'package:vitalh2x/views/revenue_report_view.dart';
+import 'package:vitalh2x/views/missing_readings_report_view.dart';
 
 class ReportsView extends StatelessWidget {
   const ReportsView({Key? key}) : super(key: key);
@@ -149,46 +156,53 @@ class ReportsView extends StatelessWidget {
   Widget _buildReportCategories() {
     final reports = [
       {
-        'title': 'Relatório Mensal',
-        'subtitle': 'Leituras e pagamentos do mês',
-        'icon': Icons.calendar_month,
+        'title': 'Relatório de Pagamentos',
+        'subtitle': 'Pagamentos com checkbox e numeração',
+        'icon': Icons.payment,
         'color': Colors.blue,
-        'route': '/reports/monthly',
+        'route': '/reports/payments',
+      },
+      {
+        'title': 'Relatório de Leituras',
+        'subtitle': 'Leituras com checkbox e numeração',
+        'icon': Icons.water_drop,
+        'color': Colors.green,
+        'route': '/reports/readings',
+      },
+      {
+        'title': 'Contas Pendentes',
+        'subtitle': 'Pagamentos ou cancelamentos em lote',
+        'icon': Icons.pending,
+        'color': Colors.orange,
+        'route': '/reports/pending-bills',
       },
       {
         'title': 'Relatório de Dívidas',
-        'subtitle': 'Clientes com contas em atraso',
+        'subtitle': 'Contas em atraso (após dia 5)',
         'icon': Icons.warning,
         'color': Colors.red,
-        'route': '/reports/debt',
+        'route': '/reports/debts',
       },
       {
-        'title': 'Consumo por Cliente',
-        'subtitle': 'Maiores consumidores',
-        'icon': Icons.trending_up,
-        'color': Colors.green,
-        'route': '/reports/consumption',
+        'title': 'Contas Pagas',
+        'subtitle': 'Histórico de contas quitadas',
+        'icon': Icons.check_circle,
+        'color': Colors.green[800]!,
+        'route': '/reports/paid-bills',
       },
       {
-        'title': 'Formas de Pagamento',
-        'subtitle': 'Análise de métodos de pagamento',
-        'icon': Icons.payment,
+        'title': 'Arrecadação por Pagamento',
+        'subtitle': 'Dinheiro por forma de pagamento mensal',
+        'icon': Icons.attach_money,
         'color': Colors.purple,
-        'route': '/reports/payment-methods',
+        'route': '/reports/revenue',
       },
       {
-        'title': 'Relatório Anual',
-        'subtitle': 'Visão geral do ano',
-        'icon': Icons.bar_chart,
-        'color': Colors.indigo,
-        'route': '/reports/annual',
-      },
-      {
-        'title': 'Eficiência Operacional',
-        'subtitle': 'KPIs e métricas',
-        'icon': Icons.speed,
-        'color': Colors.teal,
-        'route': '/reports/efficiency',
+        'title': 'Leituras Não Feitas',
+        'subtitle': 'Clientes sem leitura no mês',
+        'icon': Icons.error_outline,
+        'color': Colors.red[600]!,
+        'route': '/reports/missing-readings',
       },
     ];
 
@@ -208,13 +222,31 @@ class ReportsView extends StatelessWidget {
                 icon: report['icon'] as IconData,
                 color: report['color'] as Color,
                 onTap: () {
-                  if (DI.isAdmin) {
-                    Get.toNamed(report['route'] as String);
-                  } else {
-                    Get.snackbar(
-                      'Acesso Restrito',
-                      'Apenas administradores podem ver este relatório',
-                    );
+                  final route = report['route'] as String;
+                  switch (route) {
+                    case '/reports/payments':
+                      Get.to(() => const PaymentsReportView());
+                      break;
+                    case '/reports/readings':
+                      Get.to(() => const ReadingsReportView());
+                      break;
+                    case '/reports/pending-bills':
+                      Get.to(() => const PendingBillsReportView());
+                      break;
+                    case '/reports/debts':
+                      Get.to(() => const DebtsReportView());
+                      break;
+                    case '/reports/paid-bills':
+                      Get.to(() => const PaidBillsReportView());
+                      break;
+                    case '/reports/revenue':
+                      Get.to(() => const RevenueReportView());
+                      break;
+                    case '/reports/missing-readings':
+                      Get.to(() => const MissingReadingsReportView());
+                      break;
+                    default:
+                      Get.snackbar('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve');
                   }
                 },
               ),

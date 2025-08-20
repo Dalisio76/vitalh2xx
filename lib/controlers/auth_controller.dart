@@ -33,14 +33,19 @@ class AuthController extends BaseController {
   Future<void> _checkAutoLogin() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedEmail = prefs.getString('saved_email');
-      final savedPassword = prefs.getString('saved_password');
+      final savedUserId = prefs.getString('current_user_id');
 
-      if (savedEmail != null && savedPassword != null) {
-        email.value = savedEmail;
-        password.value = savedPassword;
-        rememberMe.value = true;
-        await login(autoLogin: true);
+      if (savedUserId != null) {
+        // Buscar usuário no banco local
+        final user = await _userRepository.findById(savedUserId);
+        if (user != null && user.isActive) {
+          _currentUser.value = user;
+          rememberMe.value = true;
+          Get.offAllNamed('/home');
+        } else {
+          // Usuário inválido, limpar dados salvos
+          await _clearSavedCredentials();
+        }
       }
     } catch (e) {
       print('Auto login error: $e');
@@ -75,9 +80,9 @@ class AuthController extends BaseController {
 
       _currentUser.value = user;
 
-      // Save credentials if remember me is checked
+      // Save user session if remember me is checked
       if (rememberMe.value) {
-        await _saveCredentials();
+        await _saveUserSession(user.id!);
       } else {
         await _clearSavedCredentials();
       }
@@ -117,14 +122,15 @@ class AuthController extends BaseController {
     }
   }
 
-  // Save credentials
-  Future<void> _saveCredentials() async {
+  // Save user session
+  Future<void> _saveUserSession(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user_id', userId);
       await prefs.setString('saved_email', email.value);
-      await prefs.setString('saved_password', password.value);
+      // Não salvar senha em texto plano por segurança
     } catch (e) {
-      print('Error saving credentials: $e');
+      print('Error saving user session: $e');
     }
   }
 
@@ -132,8 +138,9 @@ class AuthController extends BaseController {
   Future<void> _clearSavedCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('current_user_id');
       await prefs.remove('saved_email');
-      await prefs.remove('saved_password');
+      await prefs.remove('saved_password'); // Para compatibilidade
     } catch (e) {
       print('Error clearing credentials: $e');
     }

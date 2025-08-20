@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/controlers/client_controller.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
-import 'package:vitalh2x/models/leitura_model.dart';
-import 'package:vitalh2x/models/pagamento_model.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
 class ClientDetailView extends GetView<ClientController> {
   const ClientDetailView({Key? key}) : super(key: key);
@@ -17,17 +16,18 @@ class ClientDetailView extends GetView<ClientController> {
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return <Widget>[
             SliverAppBar(
-              expandedHeight: 200.0,
+              expandedHeight: 160.0,
               floating: false,
               pinned: true,
-              backgroundColor: Colors.blue[600],
+              backgroundColor: AppStyles.primaryColor,
               foregroundColor: Colors.white,
+              toolbarHeight: 48,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
                   client.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  style: AppStyles.compactTitle.copyWith(
+                    color: Colors.white,
+                    fontSize: AppStyles.fontSizeTitle,
                   ),
                 ),
                 background: Container(
@@ -35,45 +35,44 @@ class ClientDetailView extends GetView<ClientController> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.blue[600]!, Colors.blue[800]!],
+                      colors: [AppStyles.primaryColor, AppStyles.primaryColor.withOpacity(0.8)],
                     ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 30),
                       Hero(
                         tag: 'client_avatar_${client.id}',
                         child: CircleAvatar(
-                          radius: 40,
+                          radius: 28,
                           backgroundColor: Colors.white,
                           child: Text(
                             client.name.isNotEmpty
                                 ? client.name[0].toUpperCase()
                                 : '?',
                             style: TextStyle(
-                              fontSize: 32,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue[800],
+                              color: AppStyles.primaryColor,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: client.isActive ? Colors.green : Colors.red,
-                          borderRadius: BorderRadius.circular(12),
+                          color: client.isActive ? AppStyles.secondaryColor : AppStyles.errorColor,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           client.isActive ? 'ATIVO' : 'INATIVO',
-                          style: const TextStyle(
+                          style: AppStyles.compactCaption.copyWith(
                             color: Colors.white,
-                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -143,16 +142,16 @@ class ClientDetailView extends GetView<ClientController> {
           ];
         },
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppStyles.paddingLarge),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildClientInfo(client),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppStyles.paddingXLarge),
               _buildQuickActions(client),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppStyles.paddingXLarge),
               _buildStatsCards(client),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppStyles.paddingXLarge),
               _buildTabSection(client),
             ],
           ),
@@ -163,16 +162,17 @@ class ClientDetailView extends GetView<ClientController> {
 
   Widget _buildClientInfo(ClientModel client) {
     return Card(
+      margin: const EdgeInsets.all(AppStyles.paddingSmall),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppStyles.paddingLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Informações do Cliente',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: AppStyles.compactTitle,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppStyles.paddingLarge),
             _buildInfoRow('Nome Completo', client.name, Icons.person),
             _buildInfoRow('Referência', client.reference, Icons.tag),
             _buildInfoRow(
@@ -211,19 +211,24 @@ class ClientDetailView extends GetView<ClientController> {
 
   Widget _buildInfoRow(String label, String value, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppStyles.paddingSmall),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: AppStyles.paddingMedium),
           SizedBox(
-            width: 120,
+            width: 100,
             child: Text(
               '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: AppStyles.compactSubtitle,
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(
+              value,
+              style: AppStyles.compactBody,
+            ),
+          ),
         ],
       ),
     );
@@ -235,27 +240,25 @@ class ClientDetailView extends GetView<ClientController> {
         Expanded(
           child: ElevatedButton.icon(
             onPressed: () => Get.toNamed('/reading-form', arguments: client),
-            icon: const Icon(Icons.speed),
+            icon: const Icon(Icons.speed, size: 16),
             label: const Text('Nova Leitura'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[600],
-              foregroundColor: Colors.white,
+            style: AppStyles.compactButtonStyle(
+              backgroundColor: AppStyles.primaryColor,
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppStyles.paddingMedium),
         Expanded(
           child: ElevatedButton.icon(
             onPressed:
                 client.totalDebt > 0
                     ? () => Get.toNamed('/payment-form', arguments: client)
                     : null,
-            icon: const Icon(Icons.payment),
+            icon: const Icon(Icons.payment, size: 16),
             label: const Text('Pagamento'),
-            style: ElevatedButton.styleFrom(
+            style: AppStyles.compactButtonStyle(
               backgroundColor:
-                  client.totalDebt > 0 ? Colors.green[600] : Colors.grey,
-              foregroundColor: Colors.white,
+                  client.totalDebt > 0 ? AppStyles.secondaryColor : Colors.grey,
             ),
           ),
         ),
@@ -274,22 +277,22 @@ class ClientDetailView extends GetView<ClientController> {
             client.totalDebt > 0 ? Colors.red : Colors.green,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppStyles.paddingMedium),
         Expanded(
           child: _buildStatCard(
             'Total Leituras',
             '0', // TODO: Implementar contagem real
             Icons.speed,
-            Colors.blue,
+            AppStyles.primaryColor,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppStyles.paddingMedium),
         Expanded(
           child: _buildStatCard(
             'Pagamentos',
             '0', // TODO: Implementar contagem real
             Icons.payment,
-            Colors.green,
+            AppStyles.secondaryColor,
           ),
         ),
       ],
@@ -303,23 +306,23 @@ class ClientDetailView extends GetView<ClientController> {
     Color color,
   ) {
     return Card(
+      margin: const EdgeInsets.all(AppStyles.paddingSmall),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppStyles.paddingMedium),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: AppStyles.paddingSmall),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              style: AppStyles.compactSubtitle.copyWith(
                 color: color,
+                fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               label,
-              style: const TextStyle(fontSize: 12),
+              style: AppStyles.compactCaption,
               textAlign: TextAlign.center,
             ),
           ],
@@ -341,7 +344,7 @@ class ClientDetailView extends GetView<ClientController> {
             ],
           ),
           SizedBox(
-            height: 400,
+            height: 320,
             child: TabBarView(
               children: [
                 _buildReadingsTab(client),
@@ -360,26 +363,27 @@ class ClientDetailView extends GetView<ClientController> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.speed_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 16),
+          Icon(Icons.speed_outlined, size: 40, color: Colors.grey[400]),
+          const SizedBox(height: AppStyles.paddingLarge),
           Text(
             'Leituras do Cliente',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: AppStyles.compactTitle.copyWith(
               color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppStyles.paddingSmall),
           Text(
             'As leituras deste cliente aparecerão aqui',
-            style: TextStyle(color: Colors.grey[500]),
+            style: AppStyles.compactCaption.copyWith(
+              color: Colors.grey[500],
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppStyles.paddingLarge),
           ElevatedButton.icon(
             onPressed: () => Get.toNamed('/reading-form', arguments: client),
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, size: 16),
             label: const Text('Nova Leitura'),
+            style: AppStyles.compactButtonStyle(),
           ),
         ],
       ),
@@ -391,27 +395,30 @@ class ClientDetailView extends GetView<ClientController> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.payment_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 16),
+          Icon(Icons.payment_outlined, size: 40, color: Colors.grey[400]),
+          const SizedBox(height: AppStyles.paddingLarge),
           Text(
             'Pagamentos do Cliente',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: AppStyles.compactTitle.copyWith(
               color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppStyles.paddingSmall),
           Text(
             'O histórico de pagamentos aparecerá aqui',
-            style: TextStyle(color: Colors.grey[500]),
+            style: AppStyles.compactCaption.copyWith(
+              color: Colors.grey[500],
+            ),
           ),
           if (client.totalDebt > 0) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: AppStyles.paddingLarge),
             ElevatedButton.icon(
               onPressed: () => Get.toNamed('/payment-form', arguments: client),
-              icon: const Icon(Icons.payment),
+              icon: const Icon(Icons.payment, size: 16),
               label: const Text('Processar Pagamento'),
+              style: AppStyles.compactButtonStyle(
+                backgroundColor: AppStyles.secondaryColor,
+              ),
             ),
           ],
         ],
@@ -421,15 +428,15 @@ class ClientDetailView extends GetView<ClientController> {
 
   Widget _buildHistoryTab(ClientModel client) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppStyles.paddingLarge),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Resumo da Atividade',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: AppStyles.compactSubtitle,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppStyles.paddingLarge),
           _buildActivityCard(
             'Cliente Cadastrado',
             _formatDateTime(client.createdAt),
@@ -464,22 +471,35 @@ class ClientDetailView extends GetView<ClientController> {
               Icons.check_circle,
               Colors.green,
             ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppStyles.paddingXLarge),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => _generateClientReport(client),
-                  icon: const Icon(Icons.summarize),
-                  label: const Text('Relatório Completo'),
+                  icon: const Icon(Icons.summarize, size: 16),
+                  label: const Text('Relatório'),
+                  style: AppStyles.compactButtonStyle(),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppStyles.paddingMedium),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _exportClientData(client),
-                  icon: const Icon(Icons.download),
-                  label: const Text('Exportar Dados'),
+                  icon: const Icon(Icons.download, size: 16),
+                  label: const Text('Exportar'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    minimumSize: const Size(80, AppStyles.buttonHeightMedium),
+                    side: BorderSide(color: AppStyles.primaryColor),
+                    textStyle: const TextStyle(
+                      fontSize: AppStyles.fontSizeMedium,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -496,14 +516,26 @@ class ClientDetailView extends GetView<ClientController> {
     Color color,
   ) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: AppStyles.paddingSmall),
       child: ListTile(
         leading: CircleAvatar(
+          radius: 16,
           backgroundColor: color.withOpacity(0.1),
-          child: Icon(icon, color: color, size: 20),
+          child: Icon(icon, color: color, size: 16),
         ),
-        title: Text(title),
-        subtitle: Text(subtitle),
+        title: Text(
+          title,
+          style: AppStyles.compactSubtitle,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: AppStyles.compactCaption,
+        ),
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppStyles.paddingLarge,
+          vertical: AppStyles.paddingSmall,
+        ),
       ),
     );
   }
