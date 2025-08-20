@@ -1,7 +1,6 @@
 // ===== APP PAGES =====
 // lib/app/routes/app_pages.dart
 
-import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/bidings/HomeBinding.dart';
 import 'package:vitalh2x/bidings/InitialBinding.dart';
@@ -32,6 +31,15 @@ import 'package:vitalh2x/views/reading_list_view.dart';
 import 'package:vitalh2x/views/reports_view.dart';
 import 'package:vitalh2x/views/settings_view.dart';
 import 'package:vitalh2x/views/splashscreen.dart';
+import 'package:vitalh2x/views/user_detail_view.dart';
+import 'package:vitalh2x/views/user_form_view.dart';
+import 'package:vitalh2x/views/user_list_view.dart';
+import 'package:vitalh2x/views/print_settings_view.dart';
+import 'package:vitalh2x/views/revenue_report_view.dart';
+import 'package:vitalh2x/views/missing_readings_report_view.dart';
+import 'package:vitalh2x/views/readings_only_view.dart';
+import 'package:vitalh2x/views/debts_management_view.dart';
+import 'package:vitalh2x/views/billing_settings_view.dart';
 
 class AppPages {
   AppPages._();
@@ -105,10 +113,24 @@ class AppPages {
     ),
 
     GetPage(
+      name: Routes.READINGS_ONLY,
+      page: () => ReadingsOnlyView(),
+      binding: ReadingBinding(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    GetPage(
       name: Routes.MONTHLY_READINGS,
       page: () => MonthlyReadingsView(),
       binding: ReadingBinding(),
       middlewares: [AuthMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.DEBTS_MANAGEMENT,
+      page: () => DebtsManagementView(),
+      binding: ReadingBinding(),
+      middlewares: [AuthMiddleware(), AdminMiddleware()], // Apenas admins e caixas
     ),
 
     // ===== PAYMENT ROUTES =====
@@ -155,12 +177,62 @@ class AppPages {
       middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
 
+    GetPage(
+      name: Routes.REVENUE_REPORT,
+      page: () => RevenueReportView(),
+      binding: ReportBinding(),
+      middlewares: [AuthMiddleware(), ReportAccessMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.MISSING_READINGS_REPORT,
+      page: () => MissingReadingsReportView(),
+      binding: ReportBinding(),
+      middlewares: [AuthMiddleware(), ReportAccessMiddleware()],
+    ),
+
+    // ===== USER MANAGEMENT ROUTES =====
+    GetPage(
+      name: Routes.USERS,
+      page: () => const UserListView(),
+      binding: HomeBinding(), // Will create UserBinding later if needed
+      middlewares: [AuthMiddleware(), AdminMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.USER_FORM,
+      page: () => const UserFormView(),
+      binding: HomeBinding(),
+      middlewares: [AuthMiddleware(), AdminMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.USER_DETAIL,
+      page: () => const UserDetailView(),
+      binding: HomeBinding(),
+      middlewares: [AuthMiddleware(), AdminMiddleware()],
+    ),
+
     // ===== SETTINGS ROUTES =====
     GetPage(
       name: Routes.SETTINGS,
       page: () => SettingsView(),
       binding: HomeBinding(),
       middlewares: [AuthMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.PRINT_SETTINGS,
+      page: () => const PrintSettingsView(),
+      binding: HomeBinding(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    GetPage(
+      name: Routes.BILLING_SETTINGS,
+      page: () => const BillingSettingsView(),
+      binding: HomeBinding(),
+      middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
 
     // ===== HELP ROUTES =====

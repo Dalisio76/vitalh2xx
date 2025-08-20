@@ -1,5 +1,7 @@
+import 'package:vitalh2x/services/settings_service.dart';
+
 class AppConfig {
-  static const String appName = 'Water Management System';
+  static const String appName = 'VitalH2X';
   static const String appVersion = '1.0.0';
 
   // API Configuration (substitui Supabase)
@@ -22,12 +24,34 @@ class AppConfig {
   
   // Local Database Configuration
   static const String databaseName = 'water_management.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 6;
 
-  // App Settings
+  // App Settings (agora dinâmicos via SettingsService)
+  @Deprecated('Use SettingsService.instance.getPricePerCubicMeter() instead')
   static const double pricePerCubicMeter = 50.0;
-  static const int readingDay = 20; // Dia 20 de cada mês
+  
   static const String currency = 'MT'; // Meticais
+  
+  // Dynamic settings methods
+  static Future<double> getPricePerCubicMeter() async {
+    return await SettingsService.instance.getPricePerCubicMeter();
+  }
+  
+  static Future<int> getReadingDay() async {
+    return await SettingsService.instance.getReadingDay();
+  }
+  
+  static Future<String> getCompanyName() async {
+    return await SettingsService.instance.getCompanyName();
+  }
+  
+  static Future<String> getCompanyAddress() async {
+    return await SettingsService.instance.getCompanyAddress();
+  }
+  
+  static Future<String> getCompanyPhone() async {
+    return await SettingsService.instance.getCompanyPhone();
+  }
 
   // HTTP Settings
   static const int connectionTimeout = 30000; // 30 segundos

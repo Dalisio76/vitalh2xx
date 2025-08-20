@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vitalh2x/bidings/dependency_injection.dart';
+import 'package:vitalh2x/routs/rout.dart';
+import 'package:vitalh2x/views/billing_settings_view.dart';
 
 class SettingsView extends StatelessWidget {
   const SettingsView({Key? key}) : super(key: key);
@@ -89,6 +91,14 @@ class SettingsView extends StatelessWidget {
             ),
 
             ListTile(
+              leading: const Icon(Icons.monetization_on),
+              title: const Text('Configurações de Faturamento'),
+              subtitle: const Text('Preço do m³, empresa, etc.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Get.toNamed(Routes.BILLING_SETTINGS),
+            ),
+
+            ListTile(
               leading: const Icon(Icons.sync),
               title: const Text('Sincronização'),
               subtitle: const Text('Sincronizar com servidor'),
@@ -96,6 +106,14 @@ class SettingsView extends StatelessWidget {
               onTap: () {
                 Get.snackbar('Info', 'Sincronização em desenvolvimento');
               },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.print),
+              title: const Text('Configurações de Impressão'),
+              subtitle: const Text('Testar e configurar impressoras'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Get.toNamed(Routes.PRINT_SETTINGS),
             ),
 
             if (DI.isAdmin) ...[

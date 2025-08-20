@@ -1,25 +1,28 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:vitalh2x/bidings/InitialBinding.dart';
 import 'package:vitalh2x/routs/app_pages.dart';
 import 'package:vitalh2x/services/http_service.dart';
-import 'package:vitalh2x/services/auth_service.dart';
-import 'package:vitalh2x/services/sync_service.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:vitalh2x/services/settings_service.dart';
+import 'package:vitalh2x/utils/app_styles.dart';
 
 void main() async {
-  databaseFactory = databaseFactoryFfi;
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicializar serviços
+  // Configurar SQLite apenas para desktop (Windows, Linux, macOS)
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+  // No Android/iOS usa o SQLite nativo automaticamente
+
+  // Inicializar serviços HTTP
   await HttpService.initialize();
   
-  // Inicializar bindings
-  InitialBinding().dependencies();
-  
-  // Inicializar serviços globais
-  Get.put<AuthService>(AuthService(), permanent: true);
-  Get.put<SyncService>(SyncService(), permanent: true);
+  // Inicializar serviço de configurações
+  await SettingsService.instance.init();
 
   runApp(MyApp());
 }
@@ -30,8 +33,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Water Management System',
-      themeMode: ThemeMode.system,
+      title: 'VitalH2X - Sistema de Gestão de Água',
+      theme: AppStyles.compactTheme,
+      themeMode: ThemeMode.light,
       initialBinding: InitialBinding(),
       initialRoute: AppPages.INITIAL,
       getPages: AppPages.routes,

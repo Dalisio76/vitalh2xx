@@ -1,14 +1,18 @@
 // ===== READING CONTROLLER CORRIGIDO =====
 // lib/app/controllers/reading_controller.dart
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:vitalh2x/controlers/auth_controller.dart';
 import 'package:vitalh2x/controlers/base_controler.dart';
 import 'package:vitalh2x/models/cliente_model.dart';
 import 'package:vitalh2x/models/leitura_model.dart';
+import 'package:vitalh2x/models/metodo_pagamento_model.dart';
 import 'package:vitalh2x/repository/cliente_repository.dart';
 import 'package:vitalh2x/repository/reading_repository.dart';
 import 'package:vitalh2x/services/app_config.dart';
 import 'package:vitalh2x/services/database_providers.dart';
+import 'package:vitalh2x/services/print_service.dart';
 
 class ReadingController extends BaseController {
   final ReadingRepository _readingRepository = ReadingRepository(
@@ -51,6 +55,7 @@ class ReadingController extends BaseController {
   @override
   void onInit() {
     super.onInit();
+    updateOverdueReadings(); // Atualizar status das leituras em atraso primeiro
     loadMonthlyReadings();
     loadPendingBills();
     loadMonthlyStats();
@@ -59,12 +64,12 @@ class ReadingController extends BaseController {
     ever(currentReading, (_) => _calculateValues());
   }
 
-  // Load readings for current month
+  // Load readings for current month (apenas leituras pendentes, não pagas)
   Future<void> loadMonthlyReadings() async {
     try {
-      showLoading('Carregando leituras do mês...');
+      showLoading('Carregando leituras pendentes...');
 
-      final readings = await _readingRepository.findByMonth(
+      final readings = await _readingRepository.findPendingByMonth(
         currentMonth.value,
         currentYear.value,
       );
@@ -185,9 +190,20 @@ class ReadingController extends BaseController {
       notes.value = '';
 
       _calculateValues();
+      
+      // Forçar atualização da interface
+      update();
+      
+      // Mostrar informação sobre leitura anterior encontrada
+      if (lastReading != null) {
+        showSuccess('Leitura anterior carregada: ${previousReading.value.toStringAsFixed(1)} m³');
+      } else {
+        showSuccess('Primeira leitura do cliente - iniciando do zero');
+      }
     } catch (e) {
       print('Erro ao configurar nova leitura: $e');
       previousReading.value = 0.0;
+      showError('Erro ao carregar leitura anterior: $e');
     }
   }
 
@@ -213,10 +229,13 @@ class ReadingController extends BaseController {
   }
 
   // Calculate consumption and bill amount
-  void _calculateValues() {
+  void _calculateValues() async {
     if (currentReading.value > previousReading.value) {
       consumption.value = currentReading.value - previousReading.value;
-      billAmount.value = consumption.value * AppConfig.pricePerCubicMeter;
+      
+      // Use dynamic price from settings
+      final pricePerCubicMeter = await AppConfig.getPricePerCubicMeter();
+      billAmount.value = consumption.value * pricePerCubicMeter;
     } else {
       consumption.value = 0.0;
       billAmount.value = 0.0;
@@ -266,14 +285,30 @@ class ReadingController extends BaseController {
         currentReading.value,
       );
 
-      // Limpar formulário e recarregar dados
-      clearForm();
+      // Recarregar dados ANTES de limpar o formulário
       await loadMonthlyReadings();
       await loadPendingBills();
       await loadMonthlyStats();
 
       hideLoading();
       showSuccess('Leitura registrada com sucesso!');
+
+      print('DEBUG: Tentando oferecer impressão do recibo...');
+      // Salvar referência do cliente antes de limpar o formulário
+      final clientForPrint = selectedClient.value;
+      
+      // Oferecer impressão do recibo - sempre chamar
+      if (clientForPrint != null) {
+        _offerPrintReceipt(reading, clientForPrint).catchError((e) {
+          print('Erro na oferta de impressão: $e');
+        });
+        print('DEBUG: Oferta de impressão disparada.');
+      } else {
+        print('DEBUG: Cliente não encontrado, não é possível imprimir');
+      }
+
+      // Limpar formulário DEPOIS da impressão
+      clearForm();
 
       // Aguardar um pouco para mostrar a mensagem
       await Future.delayed(const Duration(milliseconds: 1500));
@@ -365,6 +400,7 @@ class ReadingController extends BaseController {
   void changeMonth(int month, int year) {
     currentMonth.value = month;
     currentYear.value = year;
+    updateOverdueReadings(); // Atualizar status primeiro
     loadMonthlyReadings();
     loadMonthlyStats();
   }
@@ -408,8 +444,19 @@ class ReadingController extends BaseController {
       return false;
     }
 
+    if (currentReading.value == previousReading.value) {
+      showError('Leitura atual deve ser diferente da anterior (consumo = 0)');
+      return false;
+    }
+
     if (currentReading.value < previousReading.value) {
       showError('Leitura atual não pode ser menor que a anterior');
+      return false;
+    }
+
+    // Validação adicional para leituras muito baixas (pode ser suspeito)
+    if (currentReading.value > 0 && currentReading.value < 1.0) {
+      showError('Leitura muito baixa. Verifique se está correta.');
       return false;
     }
 
@@ -441,8 +488,65 @@ class ReadingController extends BaseController {
     return null;
   }
 
+  // Delete reading (only for admins)
+  Future<void> deleteReading(ReadingModel reading) async {
+    try {
+      // Verificar se é administrador
+      final authController = Get.find<AuthController>();
+      if (!authController.isAdmin()) {
+        showError('Apenas administradores podem apagar leituras');
+        return;
+      }
+
+      // Confirmar exclusão
+      final confirmed = await Get.dialog<bool>(
+        AlertDialog(
+          title: const Text('Confirmar Exclusão'),
+          content: Text(
+            'Tem certeza que deseja apagar esta leitura?\n\n'
+            'Cliente: ${reading.clientId}\n'
+            'Período: ${reading.month}/${reading.year}\n'
+            'Leitura: ${reading.currentReading.toStringAsFixed(1)} m³\n\n'
+            'Esta ação não pode ser desfeita!',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Get.back(result: true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Apagar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      showLoading('Apagando leitura...');
+
+      // Apagar do banco
+      final success = await _readingRepository.delete(reading.id!);
+
+      if (success) {
+        showSuccess('Leitura apagada com sucesso');
+        await refreshData();
+      } else {
+        showError('Erro ao apagar leitura');
+      }
+
+      hideLoading();
+    } catch (e) {
+      showError('Erro ao apagar leitura: $e');
+      hideLoading();
+    }
+  }
+
   // Refresh data
   Future<void> refreshData() async {
+    await updateOverdueReadings(); // Atualizar status primeiro
     await loadMonthlyReadings();
     await loadPendingBills();
     await loadOverdueBills();
@@ -462,4 +566,297 @@ class ReadingController extends BaseController {
   // Get save button text
   String get saveButtonText =>
       isEditing.value ? 'Atualizar Leitura' : 'Salvar Leitura';
+
+  // Get client name by ID
+  Future<String> getClientName(String clientId) async {
+    try {
+      final client = await _clientRepository.findById(clientId);
+      return client?.name ?? 'Cliente não encontrado';
+    } catch (e) {
+      return 'Cliente não encontrado';
+    }
+  }
+
+  // Get client by ID
+  Future<ClientModel?> getClientById(String clientId) async {
+    try {
+      return await _clientRepository.findById(clientId);
+    } catch (e) {
+      print('Error getting client by ID: $e');
+      return null;
+    }
+  }
+
+  // Load paid bills by date range
+  Future<List<Map<String, dynamic>>> loadPaidBillsWithClientInfo({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      // Get paid readings with client info
+      final paidReadingsWithInfo = await _readingRepository.findReadingsWithClientInfo(
+        status: PaymentStatus.paid,
+      );
+      
+      // Filter by date range if provided
+      if (startDate != null || endDate != null) {
+        return paidReadingsWithInfo.where((reading) {
+          final paymentDateStr = reading['payment_date'] as String?;
+          if (paymentDateStr == null) return false;
+          
+          final paymentDate = DateTime.parse(paymentDateStr);
+          
+          if (startDate != null && paymentDate.isBefore(startDate)) {
+            return false;
+          }
+          
+          if (endDate != null && paymentDate.isAfter(endDate.add(Duration(days: 1)))) {
+            return false;
+          }
+          
+          return true;
+        }).toList();
+      }
+      
+      return paidReadingsWithInfo;
+    } catch (e) {
+      print('Error loading paid bills with client info: $e');
+      return [];
+    }
+  }
+
+  // Método legado para compatibilidade
+  Future<List<ReadingModel>> loadPaidBills({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      // First get all paid readings
+      final paidReadings = await _readingRepository.findByPaymentStatus(PaymentStatus.paid);
+      
+      // Filter by date range if provided
+      if (startDate != null || endDate != null) {
+        return paidReadings.where((reading) {
+          if (reading.paymentDate == null) return false;
+          
+          final paymentDate = reading.paymentDate!;
+          
+          if (startDate != null && paymentDate.isBefore(startDate)) {
+            return false;
+          }
+          
+          if (endDate != null && paymentDate.isAfter(endDate.add(Duration(days: 1)))) {
+            return false;
+          }
+          
+          return true;
+        }).toList();
+      }
+      
+      return paidReadings;
+    } catch (e) {
+      print('Error loading paid bills: $e');
+      return [];
+    }
+  }
+
+  // Atualizar leituras que devem virar dívidas (após dia 5 do mês - baseado no calendário do computador)
+  // Atualizar leituras que devem virar dívidas (execução silenciosa)
+  Future<void> updateOverdueReadings() async {
+    try {
+      print('🔄 Verificando leituras que devem virar dívidas...');
+      
+      final now = DateTime.now();
+      final currentDay = now.day;
+      
+      // Só atualizar se hoje é após dia 5
+      if (currentDay > 5) {
+        final overdueReadings = await _readingRepository.findOverdueReadings();
+
+        int updated = 0;
+        for (final reading in overdueReadings) {
+          // Atualizar status para overdue (dívida)
+          final success = await _readingRepository.updatePaymentStatus(
+            reading.id!,
+            PaymentStatus.overdue,
+          );
+          if (success) updated++;
+        }
+
+        if (updated > 0) {
+          print('📋 $updated leituras atualizadas para status de dívida');
+        } else {
+          print('ℹ️  Nenhuma leitura pendente encontrada para atualizar');
+        }
+      } else {
+        print('📅 Ainda dentro do prazo de pagamento (dia $currentDay <= 5)');
+      }
+    } catch (e) {
+      print('❌ Erro ao atualizar leituras em atraso: $e');
+    }
+  }
+
+  // Método para forçar atualização manual (para admin)
+  Future<void> forceUpdateOverdueReadings() async {
+    try {
+      showLoading('Atualizando status de leituras pendentes...');
+      
+      final overdueReadings = await _readingRepository.findOverdueReadings();
+      int updated = 0;
+      
+      for (final reading in overdueReadings) {
+        final success = await _readingRepository.updatePaymentStatus(
+          reading.id!,
+          PaymentStatus.overdue,
+        );
+        if (success) updated++;
+      }
+      
+      if (updated > 0) {
+        showSuccess('$updated leituras atualizadas para status de dívida');
+        await refreshData();
+      } else {
+        showSuccess('Nenhuma leitura pendente encontrada para atualizar');
+      }
+      
+      hideLoading();
+    } catch (e) {
+      showError('Erro ao atualizar leituras: $e');
+      hideLoading();
+    }
+  }
+
+  // ===== MÉTODOS DE IMPRESSÃO =====
+  
+  /// Oferece opção de imprimir recibo de leitura
+  Future<void> _offerPrintReceipt(ReadingModel reading, ClientModel client) async {
+    print('=== INÍCIO _offerPrintReceipt ===');
+    try {
+      // Verificar se o serviço de impressão está disponível
+      if (!Get.isRegistered<PrintService>()) {
+        print('PrintService não está registrado!');
+        Get.snackbar('Info', 'Sistema de impressão não configurado');
+        return;
+      }
+      
+      final printService = Get.find<PrintService>();
+      print('PrintService encontrado: ${printService.isInitialized.value}');
+      
+      if (!printService.isInitialized.value) {
+        print('PrintService não inicializado');
+        Get.snackbar('Info', 'Serviço de impressão não está ativo');
+        return;
+      }
+      
+      // Mostrar dialog simples perguntando se quer imprimir
+      final shouldPrint = await Get.dialog<bool>(
+        AlertDialog(
+          title: Text('Imprimir Recibo'),
+          content: Text(
+            'Deseja imprimir o recibo da leitura para ${client.name}?\n\n'
+            'Consumo: ${reading.consumption.toStringAsFixed(1)} m³\n'
+            'Valor: ${reading.billAmount.toStringAsFixed(2)} MT',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text('Não'),
+            ),
+            TextButton(
+              onPressed: () => Get.back(result: true),
+              child: Text('Imprimir'),
+            ),
+          ],
+        ),
+      );
+      
+      print('Dialog result: $shouldPrint');
+      if (shouldPrint == true) {
+        print('Usuário escolheu imprimir, chamando _printReadingReceipt...');
+        await _printReadingReceipt(reading, client);
+      } else {
+        print('Usuário escolheu não imprimir');
+      }
+      
+    } catch (e) {
+      print('Erro ao oferecer impressão: $e');
+      Get.snackbar('Erro', 'Erro no sistema de impressão: $e');
+    }
+    print('=== FIM _offerPrintReceipt ===');
+  }
+  
+  /// Imprime recibo de leitura
+  Future<void> _printReadingReceipt(ReadingModel reading, ClientModel client) async {
+    try {
+      showLoading('Imprimindo recibo...');
+      
+      final printService = Get.find<PrintService>();
+      
+      final success = await printService.printReadingReceipt(
+        clientName: client.name,
+        reference: client.reference,
+        previousReading: reading.previousReading,
+        currentReading: reading.currentReading,
+        consumption: reading.consumption,
+        billAmount: reading.billAmount,
+        readingDate: reading.readingDate,
+      );
+      
+      hideLoading();
+      
+      if (success) {
+        showSuccess('Recibo impresso com sucesso!');
+      } else {
+        showError('Erro na impressão: ${printService.lastError.value}');
+        // Oferecer tentar novamente
+        _offerRetryPrint(reading, client);
+      }
+      
+    } catch (e) {
+      hideLoading();
+      showError('Erro ao imprimir recibo: $e');
+    }
+  }
+  
+  /// Oferece tentar imprimir novamente
+  void _offerRetryPrint(ReadingModel reading, ClientModel client) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Falha na Impressão'),
+        content: Text(
+          'Não foi possível imprimir o recibo.\n\n'
+          'Verifique se a impressora está ligada e conectada.\n\n'
+          'Deseja tentar novamente?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              _printReadingReceipt(reading, client);
+            },
+            child: Text('Tentar Novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Método público para imprimir recibo de leitura existente
+  Future<void> printReadingReceipt(ReadingModel reading) async {
+    try {
+      final client = await _clientRepository.findById(reading.clientId);
+      if (client == null) {
+        showError('Cliente não encontrado');
+        return;
+      }
+      
+      await _printReadingReceipt(reading, client);
+    } catch (e) {
+      showError('Erro ao imprimir recibo: $e');
+    }
+  }
 }
