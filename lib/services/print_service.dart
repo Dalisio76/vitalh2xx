@@ -1,16 +1,25 @@
-// ===== SIMPLE PRINT SERVICE =====
+// ===== UNIFIED PRINT SERVICE =====
 // lib/services/print_service.dart
 
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:sunmi_printer_plus/sunmi_printer_plus.dart';
+import 'package:vitalh2x/services/settings_service.dart';
+import 'package:vitalh2x/services/windows_print_service.dart';
 
 class PrintService extends GetxService {
   static PrintService get instance => Get.find<PrintService>();
   
-  // Observáveis simples
+  // Services
+  final SettingsService _settings = SettingsService.instance;
+  final WindowsPrintService _windowsPrintService = WindowsPrintService.instance;
+  
+  // Observáveis
   final RxBool isInitialized = false.obs;
   final RxString lastError = ''.obs;
   final RxBool isPrinting = false.obs;
+  final RxBool isSunmiDevice = false.obs;
+  final RxString currentPrinterType = 'auto'.obs;
   
   @override
   Future<void> onInit() async {
@@ -21,23 +30,107 @@ class PrintService extends GetxService {
   /// Inicializa o serviço de impressão
   Future<void> initialize() async {
     try {
-      // Verificar se é um dispositivo Sunmi
-      final isSunmiDevice = await SunmiPrinter.bindingPrinter() ?? false;
+      lastError.value = '';
       
-      if (isSunmiDevice) {
-        print('Dispositivo Sunmi detectado - impressora integrada disponível');
-        isInitialized.value = true;
+      // Detectar tipo de dispositivo e definir printer type
+      await _detectPrinterType();
+      
+      // Inicializar baseado no tipo detectado
+      if (currentPrinterType.value == 'sunmi') {
+        await _initializeSunmi();
       } else {
-        print('Dispositivo não-Sunmi - usando simulação de impressão');
-        isInitialized.value = true;
+        await _initializeWindows();
       }
       
-      print('PrintService inicializado');
+      isInitialized.value = true;
+      print('PrintService inicializado: ${currentPrinterType.value}');
+      
     } catch (e) {
       lastError.value = 'Erro ao inicializar: $e';
       print('Erro ao inicializar PrintService: $e');
-      // Mesmo com erro, permitir simulação
+      // Permitir uso mesmo com erro
       isInitialized.value = true;
+    }
+  }
+
+  /// Detecta o tipo de impressora a usar
+  Future<void> _detectPrinterType() async {
+    try {
+      // Primeiro verificar configuração do usuário
+      final configuredType = await _settings.getPrinterType();
+      
+      if (configuredType == 'sunmi') {
+        // Verificar se realmente é dispositivo Sunmi
+        final isSunmi = await _checkSunmiDevice();
+        if (isSunmi) {
+          currentPrinterType.value = 'sunmi';
+          isSunmiDevice.value = true;
+          return;
+        }
+      }
+      
+      if (configuredType == 'windows') {
+        if (Platform.isWindows) {
+          currentPrinterType.value = 'windows';
+          return;
+        }
+      }
+      
+      // Auto detection
+      if (Platform.isAndroid) {
+        final isSunmi = await _checkSunmiDevice();
+        if (isSunmi) {
+          currentPrinterType.value = 'sunmi';
+          isSunmiDevice.value = true;
+        } else {
+          currentPrinterType.value = 'none';
+        }
+      } else if (Platform.isWindows) {
+        currentPrinterType.value = 'windows';
+      } else {
+        currentPrinterType.value = 'none';
+      }
+      
+    } catch (e) {
+      print('Erro na detecção do tipo de impressora: $e');
+      currentPrinterType.value = 'none';
+    }
+  }
+
+  /// Verifica se é dispositivo Sunmi
+  Future<bool> _checkSunmiDevice() async {
+    try {
+      return await SunmiPrinter.bindingPrinter() ?? false;
+    } catch (e) {
+      print('Erro ao verificar dispositivo Sunmi: $e');
+      return false;
+    }
+  }
+
+  /// Inicializa impressora Sunmi
+  Future<void> _initializeSunmi() async {
+    try {
+      await SunmiPrinter.bindingPrinter();
+      print('Impressora Sunmi inicializada');
+    } catch (e) {
+      print('Erro ao inicializar Sunmi: $e');
+      throw e;
+    }
+  }
+
+  /// Inicializa impressão Windows
+  Future<void> _initializeWindows() async {
+    try {
+      // Verificar se há impressoras disponíveis
+      final printers = await _windowsPrintService.getAvailablePrinters();
+      print('Impressoras Windows encontradas: ${printers.length}');
+      
+      if (printers.isEmpty) {
+        print('Nenhuma impressora Windows encontrada');
+      }
+    } catch (e) {
+      print('Erro ao inicializar Windows printing: $e');
+      throw e;
     }
   }
   
@@ -55,21 +148,54 @@ class PrintService extends GetxService {
       isPrinting.value = true;
       lastError.value = '';
       
-      final content = _formatReadingReceipt(
-        clientName: clientName,
-        reference: reference,
-        previousReading: previousReading,
-        currentReading: currentReading,
-        consumption: consumption,
-        billAmount: billAmount,
-        readingDate: readingDate,
-      );
+      // Verificar se impressão está habilitada
+      final printingEnabled = await _settings.getEnablePrinting();
+      if (!printingEnabled) {
+        print('Impressão desabilitada nas configurações');
+        return true; // Return true para não bloquear o fluxo
+      }
       
-      // Simular impressão ou implementar impressão real
-      await _printContent(content);
+      bool success = false;
       
-      print('Recibo de leitura impresso com sucesso');
-      return true;
+      // Imprimir baseado no tipo configurado
+      switch (currentPrinterType.value) {
+        case 'sunmi':
+          success = await _printReadingReceiptSunmi(
+            clientName: clientName,
+            reference: reference,
+            previousReading: previousReading,
+            currentReading: currentReading,
+            consumption: consumption,
+            billAmount: billAmount,
+            readingDate: readingDate,
+          );
+          break;
+          
+        case 'windows':
+          success = await _windowsPrintService.printReadingReceipt(
+            clientName: clientName,
+            reference: reference,
+            previousReading: previousReading,
+            currentReading: currentReading,
+            consumption: consumption,
+            billAmount: billAmount,
+            readingDate: readingDate,
+          );
+          if (!success) {
+            lastError.value = _windowsPrintService.lastError.value;
+          }
+          break;
+          
+        default:
+          print('Simulando impressão de recibo de leitura para $clientName');
+          success = true;
+      }
+      
+      if (success) {
+        print('Recibo de leitura impresso com sucesso');
+      }
+      
+      return success;
       
     } catch (e) {
       lastError.value = 'Erro na impressão: $e';
@@ -84,29 +210,64 @@ class PrintService extends GetxService {
   Future<bool> printPaymentReceipt({
     required String clientName,
     required String reference,
-    required double amountPaid,
+    required double billAmount,
+    required double paidAmount,
     required String paymentMethod,
-    required String receiptNumber,
     required DateTime paymentDate,
+    String? notes,
   }) async {
     try {
       isPrinting.value = true;
       lastError.value = '';
       
-      final content = _formatPaymentReceipt(
-        clientName: clientName,
-        reference: reference,
-        amountPaid: amountPaid,
-        paymentMethod: paymentMethod,
-        receiptNumber: receiptNumber,
-        paymentDate: paymentDate,
-      );
+      // Verificar se impressão está habilitada
+      final printingEnabled = await _settings.getEnablePrinting();
+      if (!printingEnabled) {
+        print('Impressão desabilitada nas configurações');
+        return true; // Return true para não bloquear o fluxo
+      }
       
-      // Simular impressão ou implementar impressão real
-      await _printContent(content);
+      bool success = false;
       
-      print('Recibo de pagamento impresso com sucesso');
-      return true;
+      // Imprimir baseado no tipo configurado
+      switch (currentPrinterType.value) {
+        case 'sunmi':
+          success = await _printPaymentReceiptSunmi(
+            clientName: clientName,
+            reference: reference,
+            billAmount: billAmount,
+            paidAmount: paidAmount,
+            paymentMethod: paymentMethod,
+            paymentDate: paymentDate,
+            notes: notes,
+          );
+          break;
+          
+        case 'windows':
+          success = await _windowsPrintService.printPaymentReceipt(
+            clientName: clientName,
+            reference: reference,
+            billAmount: billAmount,
+            paidAmount: paidAmount,
+            paymentMethod: paymentMethod,
+            paymentDate: paymentDate,
+            notes: notes,
+          );
+          if (!success) {
+            lastError.value = _windowsPrintService.lastError.value;
+          }
+          break;
+          
+        default:
+          print('Simulando impressão de recibo de pagamento para $clientName');
+          success = true;
+      }
+      
+      if (success) {
+        print('Recibo de pagamento impresso com sucesso');
+      }
+      
+      return success;
       
     } catch (e) {
       lastError.value = 'Erro na impressão: $e';
@@ -123,11 +284,31 @@ class PrintService extends GetxService {
       isPrinting.value = true;
       lastError.value = '';
       
-      final content = _formatTestReceipt();
-      await _printContent(content);
+      bool success = false;
       
-      print('Teste de impressão realizado com sucesso');
-      return true;
+      // Testar baseado no tipo configurado
+      switch (currentPrinterType.value) {
+        case 'sunmi':
+          success = await _testPrintSunmi();
+          break;
+          
+        case 'windows':
+          success = await _windowsPrintService.testPrinter();
+          if (!success) {
+            lastError.value = _windowsPrintService.lastError.value;
+          }
+          break;
+          
+        default:
+          print('Teste de impressão simulado');
+          success = true;
+      }
+      
+      if (success) {
+        print('Teste de impressão realizado com sucesso');
+      }
+      
+      return success;
       
     } catch (e) {
       lastError.value = 'Erro no teste: $e';
@@ -137,82 +318,29 @@ class PrintService extends GetxService {
       isPrinting.value = false;
     }
   }
+
+  /// Get available printers (for Windows)
+  Future<List<String>> getAvailablePrinters() async {
+    if (Platform.isWindows) {
+      return await _windowsPrintService.getAvailablePrinters();
+    }
+    return [];
+  }
+
+  /// Get current printer info
+  Map<String, dynamic> getPrinterInfo() {
+    return {
+      'type': currentPrinterType.value,
+      'isSunmiDevice': isSunmiDevice.value,
+      'isInitialized': isInitialized.value,
+      'lastError': lastError.value,
+    };
+  }
   
   // ===== MÉTODOS PRIVADOS =====
   
-  /// Processa o conteúdo para impressão
-  Future<void> _printContent(String content) async {
-    try {
-      // Tentar impressão via Sunmi primeiro
-      final isSunmiAvailable = await SunmiPrinter.bindingPrinter() ?? false;
-      
-      if (isSunmiAvailable) {
-        print('Imprimindo via Sunmi...');
-        await _printViaSunmi(content);
-      } else {
-        print('Sunmi não disponível, usando simulação...');
-        await _printViaSimulation(content);
-      }
-    } catch (e) {
-      print('Erro na impressão Sunmi, usando simulação: $e');
-      await _printViaSimulation(content);
-    }
-  }
-
-  /// Impressão via Sunmi V2
-  Future<void> _printViaSunmi(String content) async {
-    try {
-      // Configurar impressora
-      await SunmiPrinter.initPrinter();
-      
-      // Dividir conteúdo em linhas e imprimir
-      final lines = content.split('\n');
-      
-      for (final line in lines) {
-        if (line.trim().isEmpty) {
-          await SunmiPrinter.lineWrap(1);
-        } else if (line.contains('===')) {
-          // Linha separadora
-          await SunmiPrinter.printText(line.replaceAll('=', '-'));
-          await SunmiPrinter.lineWrap(1);
-        } else if (line.contains('LEITURA DE ÁGUA') || 
-                   line.contains('RECIBO DE PAGAMENTO') ||
-                   line.contains('TESTE DE IMPRESSÃO')) {
-          // Título principal
-          await SunmiPrinter.bold();
-          await SunmiPrinter.printText(line);
-          await SunmiPrinter.resetBold();
-          await SunmiPrinter.lineWrap(1);
-        } else {
-          // Texto normal
-          await SunmiPrinter.printText(line);
-          await SunmiPrinter.lineWrap(1);
-        }
-      }
-      
-      // Espaço final e cortar papel
-      await SunmiPrinter.lineWrap(3);
-      await SunmiPrinter.cut();
-      
-      print('Impressão Sunmi concluída com sucesso');
-    } catch (e) {
-      print('Erro na impressão Sunmi: $e');
-      rethrow;
-    }
-  }
-
-  /// Impressão simulada (fallback)
-  Future<void> _printViaSimulation(String content) async {
-    print('=== IMPRESSÃO SIMULADA ===');
-    print(content);
-    print('=== FIM DA IMPRESSÃO ===');
-    
-    // Simular delay de impressão
-    await Future.delayed(const Duration(milliseconds: 1000));
-  }
-  
-  /// Formata recibo de leitura
-  String _formatReadingReceipt({
+  /// Print reading receipt via SUNMI
+  Future<bool> _printReadingReceiptSunmi({
     required String clientName,
     required String reference,
     required double previousReading,
@@ -220,114 +348,203 @@ class PrintService extends GetxService {
     required double consumption,
     required double billAmount,
     required DateTime readingDate,
-  }) {
-    final dueDate = DateTime(readingDate.year, readingDate.month + 1, 5);
-    
-    return '''
-================================
-        LEITURA DE ÁGUA
-================================
-VitalH2X - Sistema de Gestão
-
-Cliente: $clientName
-Referência: $reference
-Data da Leitura: ${_formatDate(readingDate)}
-
---------------------------------
-DETALHES DA LEITURA
---------------------------------
-Leitura Anterior: ${previousReading.toStringAsFixed(1)} m³
-Leitura Atual: ${currentReading.toStringAsFixed(1)} m³
-Consumo do Mês: ${consumption.toStringAsFixed(1)} m³
-
---------------------------------
-VALOR A PAGAR: ${billAmount.toStringAsFixed(2)} MT
---------------------------------
-
-Vencimento: ${_formatDate(dueDate)}
-Pague até o dia 5 do próximo mês
-
---------------------------------
-Obrigado pela preferência!
-Sistema VitalH2X
-================================
-''';
+  }) async {
+    try {
+      await SunmiPrinter.initPrinter();
+      
+      // Header
+      await SunmiPrinter.bold();
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('RECIBO DE LEITURA');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(1);
+      
+      await SunmiPrinter.printText('VitalH2X - Sistema de Água');
+      await SunmiPrinter.lineWrap(2);
+      
+      // Company info
+      final companyName = await _settings.getCompanyName();
+      final companyAddress = await _settings.getCompanyAddress();
+      final companyPhone = await _settings.getCompanyPhone();
+      
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      await SunmiPrinter.printText(companyName);
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText(companyAddress);
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText(companyPhone);
+      await SunmiPrinter.lineWrap(2);
+      
+      // Client info
+      await SunmiPrinter.printText('Cliente: $clientName');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Referência: $reference');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Data: ${_formatDate(readingDate)}');
+      await SunmiPrinter.lineWrap(2);
+      
+      // Reading details
+      await SunmiPrinter.bold();
+      await SunmiPrinter.printText('CONSUMO:');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Leitura anterior: ${previousReading.toStringAsFixed(1)} m³');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Leitura atual: ${currentReading.toStringAsFixed(1)} m³');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Consumo: ${consumption.toStringAsFixed(1)} m³');
+      await SunmiPrinter.lineWrap(2);
+      
+      // Amount
+      await SunmiPrinter.bold();
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('VALOR A PAGAR');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('${billAmount.toStringAsFixed(2)} MT');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(3);
+      
+      // Footer
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('Obrigado pela preferência!');
+      await SunmiPrinter.lineWrap(3);
+      
+      await SunmiPrinter.cut();
+      return true;
+      
+    } catch (e) {
+      print('Erro na impressão SUNMI de leitura: $e');
+      return false;
+    }
   }
-  
-  /// Formata recibo de pagamento
-  String _formatPaymentReceipt({
+
+  /// Print payment receipt via SUNMI
+  Future<bool> _printPaymentReceiptSunmi({
     required String clientName,
     required String reference,
-    required double amountPaid,
+    required double billAmount,
+    required double paidAmount,
     required String paymentMethod,
-    required String receiptNumber,
     required DateTime paymentDate,
-  }) {
-    return '''
-================================
-       RECIBO DE PAGAMENTO
-================================
-VitalH2X - Sistema de Gestão
-
-Cliente: $clientName
-Referência: $reference
-Data: ${_formatDate(paymentDate)}
-Hora: ${_formatTime(paymentDate)}
-
---------------------------------
-DETALHES DO PAGAMENTO
---------------------------------
-Valor Pago: ${amountPaid.toStringAsFixed(2)} MT
-Método: $paymentMethod
-Recibo Nº: $receiptNumber
-
---------------------------------
-*** PAGAMENTO EFETUADO ***
-*** COM SUCESSO ***
-
-Guarde este recibo como
-comprovante de pagamento.
-
---------------------------------
-Obrigado pela preferência!
-Sistema VitalH2X
-================================
-''';
+    String? notes,
+  }) async {
+    try {
+      await SunmiPrinter.initPrinter();
+      
+      // Header
+      await SunmiPrinter.bold();
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('RECIBO DE PAGAMENTO');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(1);
+      
+      await SunmiPrinter.printText('VitalH2X - Sistema de Água');
+      await SunmiPrinter.lineWrap(2);
+      
+      // Company info
+      final companyName = await _settings.getCompanyName();
+      final companyAddress = await _settings.getCompanyAddress();
+      final companyPhone = await _settings.getCompanyPhone();
+      
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      await SunmiPrinter.printText(companyName);
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText(companyAddress);
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText(companyPhone);
+      await SunmiPrinter.lineWrap(2);
+      
+      // Payment info
+      await SunmiPrinter.printText('Cliente: $clientName');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Referência: $reference');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Data: ${_formatDate(paymentDate)}');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Hora: ${_formatTime(paymentDate)}');
+      await SunmiPrinter.lineWrap(2);
+      
+      // Payment details
+      await SunmiPrinter.bold();
+      await SunmiPrinter.printText('PAGAMENTO:');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Valor conta: ${billAmount.toStringAsFixed(2)} MT');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Valor pago: ${paidAmount.toStringAsFixed(2)} MT');
+      await SunmiPrinter.lineWrap(1);
+      
+      final change = paidAmount - billAmount;
+      if (change > 0) {
+        await SunmiPrinter.printText('Troco: ${change.toStringAsFixed(2)} MT');
+        await SunmiPrinter.lineWrap(1);
+      }
+      
+      await SunmiPrinter.printText('Método: $paymentMethod');
+      await SunmiPrinter.lineWrap(2);
+      
+      if (notes != null && notes.isNotEmpty) {
+        await SunmiPrinter.printText('Obs: $notes');
+        await SunmiPrinter.lineWrap(2);
+      }
+      
+      // Status
+      await SunmiPrinter.bold();
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('*** PAGAMENTO EFETUADO ***');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('*** COM SUCESSO ***');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(3);
+      
+      // Footer
+      await SunmiPrinter.printText('Obrigado pela preferência!');
+      await SunmiPrinter.lineWrap(3);
+      
+      await SunmiPrinter.cut();
+      return true;
+      
+    } catch (e) {
+      print('Erro na impressão SUNMI de pagamento: $e');
+      return false;
+    }
   }
-  
-  /// Formata recibo de teste
-  String _formatTestReceipt() {
-    final now = DateTime.now();
-    
-    return '''
-================================
-       TESTE DE IMPRESSÃO
-================================
-VitalH2X - Sistema de Gestão
 
-Data: ${_formatDate(now)}
-Hora: ${_formatTime(now)}
-
---------------------------------
-STATUS DO SISTEMA
---------------------------------
-✓ Conexão: OK
-✓ Impressora: OK
-✓ Sistema: Funcionando
-
-Este é um teste de impressão
-para verificar o funcionamento
-correto do sistema.
-
-Todos os componentes estão
-operando normalmente.
-
---------------------------------
-Sistema VitalH2X
-Versão 1.0.0
-================================
-''';
+  /// Test print via SUNMI
+  Future<bool> _testPrintSunmi() async {
+    try {
+      await SunmiPrinter.initPrinter();
+      
+      await SunmiPrinter.bold();
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      await SunmiPrinter.printText('TESTE DE IMPRESSÃO');
+      await SunmiPrinter.resetBold();
+      await SunmiPrinter.lineWrap(2);
+      
+      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      await SunmiPrinter.printText('VitalH2X - Sistema de Água');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Data: ${_formatDate(DateTime.now())}');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('Hora: ${_formatTime(DateTime.now())}');
+      await SunmiPrinter.lineWrap(2);
+      
+      await SunmiPrinter.printText('Se você está vendo esta mensagem,');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('a impressora está funcionando');
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText('corretamente!');
+      await SunmiPrinter.lineWrap(3);
+      
+      await SunmiPrinter.cut();
+      return true;
+      
+    } catch (e) {
+      print('Erro no teste SUNMI: $e');
+      return false;
+    }
   }
+
   
   /// Formatar data
   String _formatDate(DateTime date) {

@@ -25,6 +25,7 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
   late TextEditingController _companyPhoneController;
   late TextEditingController _taxRateController;
   late TextEditingController _minimumChargeController;
+  late TextEditingController _printerNameController;
   
   // Values
   double _currentPrice = 50.0;
@@ -34,6 +35,9 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
   double _currentTaxRate = 0.0;
   double _currentMinimumCharge = 0.0;
   int _currentReadingDay = 20;
+  String _currentPrinterName = '';
+  String _currentPrinterType = 'windows';
+  bool _currentEnablePrinting = true;
 
   bool _isLoading = true;
   bool _hasChanges = false;
@@ -52,6 +56,7 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
     _companyPhoneController = TextEditingController();
     _taxRateController = TextEditingController();
     _minimumChargeController = TextEditingController();
+    _printerNameController = TextEditingController();
 
     // Listen for changes
     _priceController.addListener(_onChanged);
@@ -60,6 +65,7 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
     _companyPhoneController.addListener(_onChanged);
     _taxRateController.addListener(_onChanged);
     _minimumChargeController.addListener(_onChanged);
+    _printerNameController.addListener(_onChanged);
   }
 
   void _onChanged() {
@@ -79,6 +85,9 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
       _currentTaxRate = await _settingsService.getTaxRate();
       _currentMinimumCharge = await _settingsService.getMinimumCharge();
       _currentReadingDay = await _settingsService.getReadingDay();
+      _currentPrinterName = await _settingsService.getPrinterName();
+      _currentPrinterType = await _settingsService.getPrinterType();
+      _currentEnablePrinting = await _settingsService.getEnablePrinting();
 
       // Update controllers
       _priceController.text = _currentPrice.toStringAsFixed(2);
@@ -87,6 +96,7 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
       _companyPhoneController.text = _currentCompanyPhone;
       _taxRateController.text = _currentTaxRate.toStringAsFixed(2);
       _minimumChargeController.text = _currentMinimumCharge.toStringAsFixed(2);
+      _printerNameController.text = _currentPrinterName;
 
       setState(() {
         _isLoading = false;
@@ -121,6 +131,9 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
       await _settingsService.setTaxRate(taxRate);
       await _settingsService.setMinimumCharge(minimumCharge);
       await _settingsService.setReadingDay(_currentReadingDay);
+      await _settingsService.setPrinterName(_printerNameController.text.trim());
+      await _settingsService.setPrinterType(_currentPrinterType);
+      await _settingsService.setEnablePrinting(_currentEnablePrinting);
 
       // Update reading controller to use new settings
       try {
@@ -207,6 +220,8 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
                     _buildCompanySection(),
                     const SizedBox(height: 24),
                     _buildBillingSettingsSection(),
+                    const SizedBox(height: 24),
+                    _buildPrintingSection(),
                     const SizedBox(height: 24),
                     _buildActionButtons(),
                   ],
@@ -693,6 +708,224 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
     }
   }
 
+  Widget _buildPrintingSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.print, color: Colors.teal),
+                const SizedBox(width: 8),
+                const Text(
+                  'Configurações de Impressão',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Enable printing switch
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.teal[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _currentEnablePrinting ? Icons.print : Icons.print_disabled,
+                    color: _currentEnablePrinting ? Colors.teal : Colors.grey,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Impressão Habilitada',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          _currentEnablePrinting 
+                            ? 'Recibos serão impressos automaticamente'
+                            : 'Impressão desabilitada - sem recibos',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _currentEnablePrinting,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentEnablePrinting = value;
+                        _hasChanges = true;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Printer type selection
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tipo de Impressora',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<String>(
+                    value: _currentPrinterType,
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'windows',
+                        child: Text('Windows (Nome da Impressora)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'sunmi',
+                        child: Text('SUNMI (Impressora Integrada)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'none',
+                        child: Text('Nenhuma (Apenas Simulação)'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _currentPrinterType = value ?? 'windows';
+                        _hasChanges = true;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Printer name (only for Windows)
+            if (_currentPrinterType == 'windows') ...[
+              TextFormField(
+                controller: _printerNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome da Impressora',
+                  hintText: 'Ex: HP LaserJet Pro, Epson L3150, etc.',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.print),
+                  helperText: 'Nome exato da impressora instalada no Windows',
+                ),
+                validator: (value) {
+                  if (_currentEnablePrinting && _currentPrinterType == 'windows') {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Nome da impressora é obrigatório';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.amber[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, 
+                         color: Colors.amber[700], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Digite o nome EXATO da impressora como aparece no Windows.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (_currentPrinterType == 'sunmi') ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, 
+                         color: Colors.green[700], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Usa a impressora térmica integrada do dispositivo SUNMI.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, 
+                         color: Colors.grey[600], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Impressão simulada - recibos apenas exibidos no console.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _priceController.dispose();
@@ -701,6 +934,7 @@ class _BillingSettingsViewState extends State<BillingSettingsView> {
     _companyPhoneController.dispose();
     _taxRateController.dispose();
     _minimumChargeController.dispose();
+    _printerNameController.dispose();
     super.dispose();
   }
 }

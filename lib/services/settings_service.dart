@@ -11,6 +11,9 @@ class SettingsService {
   static const String _readingDayKey = 'reading_day';
   static const String _taxRateKey = 'tax_rate';
   static const String _minimumChargeKey = 'minimum_charge';
+  static const String _printerNameKey = 'printer_name';
+  static const String _printerTypeKey = 'printer_type';
+  static const String _enablePrintingKey = 'enable_printing';
 
   // Valores padrão
   static const double _defaultPricePerCubicMeter = 50.0;
@@ -20,6 +23,9 @@ class SettingsService {
   static const int _defaultReadingDay = 20;
   static const double _defaultTaxRate = 0.0;
   static const double _defaultMinimumCharge = 0.0;
+  static const String _defaultPrinterName = '';
+  static const String _defaultPrinterType = 'windows';
+  static const bool _defaultEnablePrinting = true;
 
   // Singleton
   static SettingsService? _instance;
@@ -123,6 +129,44 @@ class SettingsService {
     await _prefs?.setDouble(_minimumChargeKey, charge);
   }
 
+  // ===== PRINTER SETTINGS =====
+
+  /// Get printer name
+  Future<String> getPrinterName() async {
+    await init();
+    return _prefs?.getString(_printerNameKey) ?? _defaultPrinterName;
+  }
+
+  /// Set printer name
+  Future<void> setPrinterName(String printerName) async {
+    await init();
+    await _prefs?.setString(_printerNameKey, printerName);
+  }
+
+  /// Get printer type (sunmi, windows, etc.)
+  Future<String> getPrinterType() async {
+    await init();
+    return _prefs?.getString(_printerTypeKey) ?? _defaultPrinterType;
+  }
+
+  /// Set printer type
+  Future<void> setPrinterType(String printerType) async {
+    await init();
+    await _prefs?.setString(_printerTypeKey, printerType);
+  }
+
+  /// Get printing enabled status
+  Future<bool> getEnablePrinting() async {
+    await init();
+    return _prefs?.getBool(_enablePrintingKey) ?? _defaultEnablePrinting;
+  }
+
+  /// Set printing enabled status
+  Future<void> setEnablePrinting(bool enabled) async {
+    await init();
+    await _prefs?.setBool(_enablePrintingKey, enabled);
+  }
+
   // ===== UTILITY METHODS =====
 
   /// Calculate bill amount with current settings
@@ -154,6 +198,9 @@ class SettingsService {
     await _prefs?.setInt(_readingDayKey, _defaultReadingDay);
     await _prefs?.setDouble(_taxRateKey, _defaultTaxRate);
     await _prefs?.setDouble(_minimumChargeKey, _defaultMinimumCharge);
+    await _prefs?.setString(_printerNameKey, _defaultPrinterName);
+    await _prefs?.setString(_printerTypeKey, _defaultPrinterType);
+    await _prefs?.setBool(_enablePrintingKey, _defaultEnablePrinting);
   }
 
   /// Export all settings
@@ -166,6 +213,9 @@ class SettingsService {
       'reading_day': await getReadingDay(),
       'tax_rate': await getTaxRate(),
       'minimum_charge': await getMinimumCharge(),
+      'printer_name': await getPrinterName(),
+      'printer_type': await getPrinterType(),
+      'enable_printing': await getEnablePrinting(),
     };
   }
 
@@ -191,6 +241,15 @@ class SettingsService {
     }
     if (settings['minimum_charge'] != null) {
       await setMinimumCharge(settings['minimum_charge'].toDouble());
+    }
+    if (settings['printer_name'] != null) {
+      await setPrinterName(settings['printer_name']);
+    }
+    if (settings['printer_type'] != null) {
+      await setPrinterType(settings['printer_type']);
+    }
+    if (settings['enable_printing'] != null) {
+      await setEnablePrinting(settings['enable_printing']);
     }
   }
 }
