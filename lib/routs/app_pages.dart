@@ -40,6 +40,7 @@ import 'package:vitalh2x/views/missing_readings_report_view.dart';
 import 'package:vitalh2x/views/readings_only_view.dart';
 import 'package:vitalh2x/views/debts_management_view.dart';
 import 'package:vitalh2x/views/billing_settings_view.dart';
+import 'package:vitalh2x/bidings/user_binding.dart';
 
 class AppPages {
   AppPages._();
@@ -195,21 +196,21 @@ class AppPages {
     GetPage(
       name: Routes.USERS,
       page: () => const UserListView(),
-      binding: HomeBinding(), // Will create UserBinding later if needed
+      binding: UserBinding(),
       middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
 
     GetPage(
       name: Routes.USER_FORM,
       page: () => const UserFormView(),
-      binding: HomeBinding(),
+      binding: UserBinding(),
       middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
 
     GetPage(
       name: Routes.USER_DETAIL,
       page: () => const UserDetailView(),
-      binding: HomeBinding(),
+      binding: UserBinding(),
       middlewares: [AuthMiddleware(), AdminMiddleware()],
     ),
 

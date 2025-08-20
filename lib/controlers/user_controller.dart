@@ -3,6 +3,7 @@
 
 import 'package:crypto/crypto.dart';
 import 'package:get/get.dart';
+import 'package:vitalh2x/controlers/auth_controller.dart';
 import 'package:vitalh2x/controlers/base_controler.dart';
 import 'package:vitalh2x/models/usuario_model.dart';
 import 'package:vitalh2x/repository/user_repository.dart';
@@ -45,6 +46,7 @@ class UserController extends BaseController {
   @override
   void onInit() {
     super.onInit();
+    _loadCurrentUser();
     loadUsers();
     loadStats();
 
@@ -52,6 +54,16 @@ class UserController extends BaseController {
     ever(searchTerm, (_) => filterUsers());
     ever(filterRole, (_) => filterUsers());
     ever(showOnlyActive, (_) => filterUsers());
+  }
+
+  // Load current user from auth controller
+  void _loadCurrentUser() {
+    try {
+      final authController = Get.find<AuthController>();
+      currentUser.value = authController.currentUser;
+    } catch (e) {
+      print('Error loading current user: $e');
+    }
   }
 
   // Load all users
