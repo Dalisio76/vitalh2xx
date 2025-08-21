@@ -36,6 +36,11 @@ class ReadingController extends BaseController {
   final RxString clientReference = ''.obs;
   final RxDouble currentReading = 0.0.obs;
   final RxString notes = ''.obs;
+  
+  // Client search
+  final RxString clientSearchTerm = ''.obs;
+  final RxList<ClientModel> searchResults = <ClientModel>[].obs;
+  final RxBool isSearching = false.obs;
 
   // Calculated fields
   final RxDouble previousReading = 0.0.obs;
@@ -62,6 +67,9 @@ class ReadingController extends BaseController {
 
     // Setup reactive calculations
     ever(currentReading, (_) => _calculateValues());
+    
+    // Setup reactive client search
+    debounce(clientSearchTerm, (_) => searchClients(), time: const Duration(milliseconds: 500));
   }
 
   // Load readings for current month (apenas leituras pendentes, não pagas)
@@ -150,6 +158,10 @@ class ReadingController extends BaseController {
       }
 
       selectedClient.value = client;
+      
+      // Clear search when client is found via reference
+      clientSearchTerm.value = '';
+      searchResults.clear();
 
       // Verificar se já existe leitura para este mês
       final existingReading = await _readingRepository.findByClientAndMonth(
@@ -430,6 +442,60 @@ class ReadingController extends BaseController {
     selectedClient.value = null;
     selectedReading.value = null;
     isEditing.value = false;
+    clientSearchTerm.value = '';
+    searchResults.clear();
+  }
+
+  // Search clients by name or reference
+  Future<void> searchClients() async {
+    try {
+      final searchTerm = clientSearchTerm.value.trim();
+      
+      if (searchTerm.isEmpty) {
+        searchResults.clear();
+        return;
+      }
+
+      if (searchTerm.length < 2) {
+        return; // Require at least 2 characters
+      }
+
+      isSearching.value = true;
+
+      // Search active clients by name or reference
+      final clients = await _clientRepository.searchClients(searchTerm);
+      
+      // Filter only active clients
+      final activeClients = clients.where((client) => client.isActive).toList();
+      
+      searchResults.assignAll(activeClients);
+
+    } catch (e) {
+      print('Error searching clients: $e');
+      searchResults.clear();
+    } finally {
+      isSearching.value = false;
+    }
+  }
+
+  // Select client from search results
+  void selectClientFromSearch(ClientModel client) {
+    selectedClient.value = client;
+    clientReference.value = client.reference;
+    clientSearchTerm.value = client.name; // Show selected client name in search
+    searchResults.clear(); // Hide dropdown
+    
+    // Load client data (readings, etc.)
+    findClientByReference();
+  }
+
+  // Clear client search
+  void clearClientSearch() {
+    clientSearchTerm.value = '';
+    searchResults.clear();
+    selectedClient.value = null;
+    clientReference.value = '';
+    _resetForm();
   }
 
   // Form validation

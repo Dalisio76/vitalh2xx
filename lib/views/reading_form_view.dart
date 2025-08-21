@@ -89,13 +89,158 @@ class ReadingFormView extends GetView<ReadingController> {
             ),
             const SizedBox(height: 16),
 
-            // Campo de referência
+            // Campo de busca de cliente
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '🔍 Buscar Cliente',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Digite o nome ou referência do cliente para buscar:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Campo de busca
+                  Stack(
+                    children: [
+                      Obx(
+                        () => TextFormField(
+                          initialValue: controller.clientSearchTerm.value,
+                          decoration: InputDecoration(
+                            labelText: 'Buscar cliente...',
+                            hintText: 'Ex: João Silva, CLI001',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: controller.clientSearchTerm.value.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: controller.clearClientSearch,
+                                  )
+                                : null,
+                          ),
+                          onChanged: (value) => controller.clientSearchTerm.value = value,
+                        ),
+                      ),
+                      
+                      // Loading indicator
+                      Obx(() {
+                        if (!controller.isSearching.value) return const SizedBox.shrink();
+                        return Positioned(
+                          right: 8,
+                          top: 12,
+                          child: const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                  
+                  // Search results dropdown
+                  Obx(() {
+                    if (controller.searchResults.isEmpty) return const SizedBox.shrink();
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: controller.searchResults.length,
+                        itemBuilder: (context, index) {
+                          final client = controller.searchResults[index];
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Colors.blue[100],
+                              child: Text(
+                                client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              client.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Ref: ${client.reference}'),
+                                Text('Contador: ${client.counterNumber}'),
+                              ],
+                            ),
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                            onTap: () => controller.selectClientFromSearch(client),
+                          );
+                        },
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Divider
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'OU',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+
+            // Campo de referência manual
             Obx(
               () => TextFormField(
                 initialValue: controller.clientReference.value,
                 decoration: const InputDecoration(
-                  labelText: 'Referência do Cliente *',
-                  hintText: 'Digite a referência (ex: CLI001)',
+                  labelText: 'Referência Manual *',
+                  hintText: 'Digite a referência manualmente (ex: CLI001)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.tag),
                 ),

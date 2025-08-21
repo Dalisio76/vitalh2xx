@@ -152,6 +152,14 @@ class ClientRepository extends BaseRepository<ClientModel> {
     return count > 0;
   }
 
+  // Search clients by name or reference
+  Future<List<ClientModel>> searchClients(String searchTerm) async {
+    return await findActiveClients(
+      searchTerm: searchTerm,
+      limit: 10, // Limit to 10 results for performance
+    );
+  }
+
   // Estatísticas de clientes
   Future<Map<String, int>> getClientStats() async {
     final stats = <String, int>{};
