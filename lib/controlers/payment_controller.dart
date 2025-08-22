@@ -537,9 +537,9 @@ class PaymentController extends BaseController {
       final success = await printService.printPaymentReceipt(
         clientName: selectedClient.value?.name ?? 'Cliente',
         reference: selectedClient.value?.reference ?? 'N/A',
-        amountPaid: payment.amountPaid,
+        billAmount: selectedReading.value?.billAmount ?? payment.amountPaid,
+        paidAmount: payment.amountPaid,
         paymentMethod: payment.paymentMethod.displayName,
-        receiptNumber: payment.receiptNumber,
         paymentDate: payment.paymentDate,
       );
       

@@ -6,7 +6,7 @@ import 'package:get/get.dart';
 import 'package:vitalh2x/services/print_service.dart';
 
 class PrintSettingsView extends StatelessWidget {
-  const PrintSettingsView({Key? key}) : super(key: key);
+  const PrintSettingsView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -378,9 +378,9 @@ class PrintSettingsView extends StatelessWidget {
       final success = await printService.printPaymentReceipt(
         clientName: 'MARIA SANTOS (TESTE)',
         reference: 'TEST002',
-        amountPaid: 1250.0,
+        billAmount: 1250.0,
+        paidAmount: 1250.0,
         paymentMethod: 'Dinheiro',
-        receiptNumber: 'REC-2025-001',
         paymentDate: DateTime.now(),
       );
       

@@ -10,7 +10,7 @@ import 'package:vitalh2x/utils/app_styles.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Configurar SQLite apenas para desktop (Windows, Linux, macOS)
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
@@ -20,7 +20,7 @@ void main() async {
 
   // Inicializar serviços HTTP
   await HttpService.initialize();
-  
+
   // Inicializar serviço de configurações
   await SettingsService.instance.init();
 

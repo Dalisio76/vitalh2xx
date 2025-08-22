@@ -354,7 +354,7 @@ class PrintService extends GetxService {
       
       // Header
       await SunmiPrinter.bold();
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('RECIBO DE LEITURA');
       await SunmiPrinter.resetBold();
       await SunmiPrinter.lineWrap(1);
@@ -367,7 +367,7 @@ class PrintService extends GetxService {
       final companyAddress = await _settings.getCompanyAddress();
       final companyPhone = await _settings.getCompanyPhone();
       
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      // await SunmiPrinter.setAlignment(SunmiAlign.LEFT); // TODO: Fix alignment enum
       await SunmiPrinter.printText(companyName);
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText(companyAddress);
@@ -397,7 +397,7 @@ class PrintService extends GetxService {
       
       // Amount
       await SunmiPrinter.bold();
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('VALOR A PAGAR');
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText('${billAmount.toStringAsFixed(2)} MT');
@@ -405,7 +405,7 @@ class PrintService extends GetxService {
       await SunmiPrinter.lineWrap(3);
       
       // Footer
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('Obrigado pela preferência!');
       await SunmiPrinter.lineWrap(3);
       
@@ -433,7 +433,7 @@ class PrintService extends GetxService {
       
       // Header
       await SunmiPrinter.bold();
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('RECIBO DE PAGAMENTO');
       await SunmiPrinter.resetBold();
       await SunmiPrinter.lineWrap(1);
@@ -446,7 +446,7 @@ class PrintService extends GetxService {
       final companyAddress = await _settings.getCompanyAddress();
       final companyPhone = await _settings.getCompanyPhone();
       
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      // await SunmiPrinter.setAlignment(SunmiAlign.LEFT); // TODO: Fix alignment enum
       await SunmiPrinter.printText(companyName);
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText(companyAddress);
@@ -490,7 +490,7 @@ class PrintService extends GetxService {
       
       // Status
       await SunmiPrinter.bold();
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('*** PAGAMENTO EFETUADO ***');
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText('*** COM SUCESSO ***');
@@ -516,12 +516,12 @@ class PrintService extends GetxService {
       await SunmiPrinter.initPrinter();
       
       await SunmiPrinter.bold();
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.CENTER);
+      // await SunmiPrinter.setAlignment(SunmiAlign.CENTER); // TODO: Fix alignment enum
       await SunmiPrinter.printText('TESTE DE IMPRESSÃO');
       await SunmiPrinter.resetBold();
       await SunmiPrinter.lineWrap(2);
       
-      await SunmiPrinter.setAlignment(SunmiPrintAlign.LEFT);
+      // await SunmiPrinter.setAlignment(SunmiAlign.LEFT); // TODO: Fix alignment enum
       await SunmiPrinter.printText('VitalH2X - Sistema de Água');
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText('Data: ${_formatDate(DateTime.now())}');

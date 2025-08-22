@@ -70,7 +70,7 @@ class HomeView extends StatelessWidget {
   Widget _buildWelcomeSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -88,25 +88,17 @@ class HomeView extends StatelessWidget {
           Text(
             'Olá, ${DI.userName}!',
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             'Perfil: ${DI.userRole}',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Tenha um ótimo dia de trabalho!',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
             ),
           ),
         ],
@@ -126,7 +118,7 @@ class HomeView extends StatelessWidget {
             color: Colors.grey[800],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildStatsGrid(),
       ],
     );
@@ -148,10 +140,10 @@ class HomeView extends StatelessWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.5,
+                  childAspectRatio: 1.2,
                   children: [
                     StatsCard(
-                      title: 'Clientes Ativos',
+                      title: 'Clientes',
                       value: '${clientController.stats['active'] ?? 0}',
                       icon: Icons.people,
                       color: Colors.blue,
@@ -206,12 +198,12 @@ class HomeView extends StatelessWidget {
         Text(
           'Ações Rápidas',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.grey[800],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildQuickActionsGrid(),
       ],
     );
@@ -296,7 +288,7 @@ class HomeView extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.2,
+        childAspectRatio: 0.9,
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {

@@ -11,7 +11,8 @@
       "WebSearch",
       "WebFetch(domain:pub.dev)",
       "Bash(dart:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": []
   }
