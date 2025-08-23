@@ -32,23 +32,32 @@ class AuthController extends BaseController {
   // Check for auto login
   Future<void> _checkAutoLogin() async {
     try {
+      // Aguardar um pouco para garantir que o banco esteja inicializado
+      await Future.delayed(Duration(milliseconds: 500));
+      
       final prefs = await SharedPreferences.getInstance();
       final savedUserId = prefs.getString('current_user_id');
 
       if (savedUserId != null) {
+        print('🔍 AUTO LOGIN - Tentando com ID: $savedUserId');
         // Buscar usuário no banco local
         final user = await _userRepository.findById(savedUserId);
         if (user != null && user.isActive) {
+          print('✅ AUTO LOGIN - Usuário encontrado: ${user.name}');
           _currentUser.value = user;
           rememberMe.value = true;
           Get.offAllNamed('/home');
         } else {
+          print('❌ AUTO LOGIN - Usuário inválido, limpando dados');
           // Usuário inválido, limpar dados salvos
           await _clearSavedCredentials();
         }
+      } else {
+        print('🔍 AUTO LOGIN - Nenhum usuário salvo encontrado');
       }
     } catch (e) {
-      print('Auto login error: $e');
+      print('❌ AUTO LOGIN - Erro: $e');
+      await _clearSavedCredentials();
     }
   }
 

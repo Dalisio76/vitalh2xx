@@ -23,7 +23,7 @@ class UserRepository extends BaseRepository<UserModel> {
     final results = await databaseProvider.query(
       tableName,
       where: 'email = ? AND is_active = 1',
-      whereArgs: [email],
+      whereArgs: [email.trim()],
       limit: 1,
     );
 
@@ -34,10 +34,14 @@ class UserRepository extends BaseRepository<UserModel> {
   // Verificar login
   Future<UserModel?> authenticate(String email, String password) async {
     final user = await findByEmail(email);
-    if (user == null) return null;
+    
+    if (user == null) {
+      return null;
+    }
 
     // Verificar hash da senha
     final hashedPassword = _hashPassword(password);
+
     if (user.passwordHash == hashedPassword) {
       // Atualizar último login
       await updateLastLogin(user.id!);

@@ -185,9 +185,80 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_users_active ON users(is_active)');
   }
 
+  // TESTE TEMPORÁRIO - Listar todos os usuários
+  Future<void> _listAllUsers(Database db) async {
+    try {
+      final users = await db.query('users');
+      print('🔍 TESTE - Total de usuários no banco: ${users.length}');
+      
+      for (int i = 0; i < users.length; i++) {
+        final user = users[i];
+        print('🔍 TESTE - Usuário $i:');
+        print('   - ID: ${user['id']}');
+        print('   - Nome: ${user['name']}');
+        print('   - Email: ${user['email']}');
+        print('   - Ativo: ${user['is_active']}');
+        print('   - Hash: ${user['password_hash']}');
+      }
+    } catch (e) {
+      print('❌ TESTE - Erro ao listar usuários: $e');
+    }
+  }
+
+  // CORREÇÃO TEMPORÁRIA - Corrigir hashes de senhas em texto simples
+  Future<void> _fixPasswordHashes(Database db) async {
+    try {
+      // Mapear senhas em texto simples para senhas corretas
+      final passwordMap = {
+        'admin123': 'admin123',
+        'admin': 'admin123',  // Caso existam outras variações
+        '123456': '123456',
+      };
+      
+      final users = await db.query('users');
+      for (final user in users) {
+        String currentHash = user['password_hash'].toString();
+        
+        // Verificar se o hash é texto simples (menos de 32 caracteres = não é hash SHA256)
+        if (currentHash.length < 32) {
+          print('🔧 Corrigindo senha do usuário: ${user['email']} (hash atual: $currentHash)');
+          
+          String correctPassword = passwordMap[currentHash] ?? currentHash;
+          String correctHash = _hashPassword(correctPassword);
+          
+          await db.update(
+            'users',
+            {'password_hash': correctHash, 'updated_at': DateTime.now().toIso8601String()},
+            where: 'id = ?',
+            whereArgs: [user['id']],
+          );
+          
+          print('✅ Hash corrigido para: $correctHash');
+        }
+      }
+      
+      print('🔧 Correção de hashes concluída!');
+    } catch (e) {
+      print('❌ Erro ao corrigir hashes: $e');
+    }
+  }
+
   // Inserir administrador padrão
   Future<void> _insertDefaultAdmin(Database db) async {
     try {
+      // Primeiro, verificar se o admin já existe
+      final existingAdmin = await db.query(
+        'users', 
+        where: 'email = ?', 
+        whereArgs: ['admin@waterSystem.local'],
+        limit: 1
+      );
+      
+      if (existingAdmin.isNotEmpty) {
+        print('Administrador já existe no banco');
+        return;
+      }
+
       final defaultAdmin = UserModel(
         id: 'admin-001',
         name: 'Administrador',
@@ -204,7 +275,24 @@ class DatabaseService {
         'Usuário administrador criado: email: admin@waterSystem.local, senha: admin123',
       );
     } catch (e) {
-      print('Administrador já existe ou erro ao criar: $e');
+      print('Erro ao criar administrador: $e');
+      // Se der erro, tentar inserir ou atualizar de qualquer forma
+      try {
+        await db.execute('''
+          INSERT OR REPLACE INTO users (
+            id, name, email, phone, role, password_hash, 
+            created_at, updated_at, last_login, is_active
+          ) VALUES (
+            'admin-001', 'Administrador', 'admin@waterSystem.local', '84000000000',
+            ${UserRole.admin.index}, '${_hashPassword('admin123')}',
+            '${DateTime.now().toIso8601String()}', '${DateTime.now().toIso8601String()}',
+            NULL, 1
+          )
+        ''');
+        print('Administrador inserido via SQL direto');
+      } catch (e2) {
+        print('Falha total ao criar admin: $e2');
+      }
     }
   }
 
@@ -578,6 +666,13 @@ class DatabaseService {
     print('Base de dados aberta com sucesso!');
     // Ativar foreign keys
     await db.execute('PRAGMA foreign_keys = ON');
+    
+    // CORREÇÃO TEMPORÁRIA - Corrigir hashes no Windows
+    if (Platform.isWindows) {
+      print('🔧 CORRIGINDO HASHES DAS SENHAS NO WINDOWS...');
+      await _fixPasswordHashes(db);
+      await _listAllUsers(db);
+    }
   }
 
   // ===== MÉTODOS DE MIGRAÇÃO MANUAL =====

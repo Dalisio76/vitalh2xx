@@ -12,7 +12,11 @@
       "WebFetch(domain:pub.dev)",
       "Bash(dart:*)",
       "Bash(git add:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(flutter:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell:*)",
+      "Bash(del \"C:\\Users\\Frentex\\source\\vitalh2x\\test_*.dart\")"
     ],
     "deny": []
   }
